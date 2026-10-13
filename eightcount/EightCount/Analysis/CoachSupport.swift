@@ -50,6 +50,22 @@ enum CoachSupport {
     /// Joints to paint red for a finding's body part (see `PoseComparer`:
     /// "Left elbow", "Right arm", "Left hand", "Knees", "Hips", "Torso",
     /// "Move size", "Timing"). Case-insensitive; unknown names give nothing.
+    /// Same joints on the other side of the body (left ↔ right). Used for the
+    /// tutorial skeleton when only one of the two videos is shown mirrored:
+    /// then the tutorial's matching limb is on the opposite side.
+    static func swappedSides(_ joints: Set<Joint>) -> Set<Joint> {
+        Set(joints.map { joint in
+            let name = joint.rawValue
+            if name.hasPrefix("left") {
+                return Joint(rawValue: "right" + name.dropFirst(4)) ?? joint
+            }
+            if name.hasPrefix("right") {
+                return Joint(rawValue: "left" + name.dropFirst(5)) ?? joint
+            }
+            return joint
+        })
+    }
+
     static func joints(forBodyPart bodyPart: String) -> Set<Joint> {
         let s = bodyPart.lowercased()
         if s.contains("move size") || s.contains("timing") { return [] }

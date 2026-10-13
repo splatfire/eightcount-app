@@ -244,8 +244,11 @@ struct CompareView: View {
             tutorialVideo
                 .opacity(isSideBySide ? 1 : ghostOpacity)
             if overlayOn {
+                // The tips name YOUR limbs; if only one video is mirrored, the
+                // tutorial's matching limb is on the other side.
                 poseLayer(pose: coachPoses?.tutorial, mirrored: mirrorTutorial, color: Theme.loopColor,
-                          highlight: highlight, paneSize: rect.size)
+                          highlight: mirrorMe == mirrorTutorial ? highlight : CoachSupport.swappedSides(highlight),
+                          paneSize: rect.size)
             }
         }
         .frame(width: rect.width, height: rect.height)
