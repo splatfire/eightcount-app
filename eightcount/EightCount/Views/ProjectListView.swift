@@ -80,7 +80,7 @@ struct ProjectListView: View {
             Button("Delete Project", role: .destructive) { delete(project) }
             Button("Cancel", role: .cancel) {}
         } message: { _ in
-            Text("This deletes the project, its notes, its snapshots and its copy of the video. This can't be undone.")
+            Text("This deletes the project, its notes, its snapshots, your recordings and its copy of the video. This can't be undone.")
         }
         // `presenting:` hands the project to the buttons, so Save still knows
         // which project it is even after the alert has started closing.
@@ -179,6 +179,7 @@ struct ProjectListView: View {
     private func delete(_ project: Project) {
         path.removeAll { $0.id == project.id }
         VideoStorage.deleteVideo(named: project.videoFileName)
+        TakeStore.deleteTakeFiles(of: project)   // your recordings
         modelContext.delete(project)   // notes and snapshots are deleted too (cascade)
         try? modelContext.save()
         projectToDelete = nil

@@ -196,12 +196,10 @@ struct CountRowView: View {
         Button(action: onToggleLoop) {
             Image(systemName: "repeat")
                 .font(.title3.weight(.semibold))
-                .foregroundStyle(isLooped ? Color.black : Color.white)
+                .foregroundStyle(isLooped && !Theme.usesGlass ? Color.black : Color.white)
                 .frame(width: 48, height: 48)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(isLooped ? Theme.loopColor : Theme.surfaceRaised)
-                )
+                .glassSurface(RoundedRectangle(cornerRadius: 12, style: .continuous),
+                              tint: isLooped ? Theme.loopColor : nil, interactive: true)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -218,10 +216,7 @@ struct CountRowView: View {
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(Color.white)
                 .frame(width: 48, height: 48)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Theme.surfaceRaised)
-                )
+                .glassSurface(RoundedRectangle(cornerRadius: 12, style: .continuous), interactive: true)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

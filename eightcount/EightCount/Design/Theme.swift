@@ -17,21 +17,25 @@ enum Theme {
 
 /// A big rounded button used for most controls.
 /// `isOn` tints the button to show an active toggle (mirror, loop, ...).
+/// On iOS 26+ it is made of Liquid Glass (see Design/Glass.swift).
 struct BigButtonStyle: ButtonStyle {
     var isOn = false
     var tint: Color = Theme.accent
 
     func makeBody(configuration: Configuration) -> some View {
+        let glass = Theme.usesGlass
         configuration.label
             .font(.system(.headline, design: .rounded))
             .frame(maxWidth: .infinity, minHeight: Theme.tapHeight)
             .padding(.horizontal, 6)
-            .foregroundStyle(isOn ? Color.black : Color.white)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isOn ? tint : Theme.surfaceRaised)
+            // Tinted glass is see-through, so white text reads better there.
+            .foregroundStyle(isOn && !glass ? Color.black : Color.white)
+            .glassSurface(
+                RoundedRectangle(cornerRadius: 14, style: .continuous),
+                tint: isOn ? tint : nil,
+                interactive: true
             )
-            .opacity(configuration.isPressed ? 0.6 : 1)
+            .opacity(configuration.isPressed && !glass ? 0.6 : 1)
             .contentShape(Rectangle())
     }
 }

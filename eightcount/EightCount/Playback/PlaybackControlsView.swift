@@ -29,12 +29,14 @@ struct PlaybackControlsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 6) {
-            timelineRow
-            FineScrubber(controller: controller)
-            transportRow
-            speedRow
-            loopRow
+        GlassGroup(spacing: 6) {
+            VStack(spacing: 6) {
+                timelineRow
+                FineScrubber(controller: controller)
+                transportRow
+                speedRow
+                loopRow
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)

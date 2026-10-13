@@ -25,6 +25,11 @@ final class Project {
     @Relationship(deleteRule: .cascade, inverse: \CountNote.project)
     var notes: [CountNote] = []
 
+    /// Recordings of you dancing along. Deleted with the project
+    /// (their video files are removed by `TakeStore` / the project list).
+    @Relationship(deleteRule: .cascade, inverse: \Take.project)
+    var takes: [Take] = []
+
     init(title: String, section: String = "", bpm: Double = 0, offset: Double = 0) {
         self.id = UUID()
         self.title = title

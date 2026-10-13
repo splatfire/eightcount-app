@@ -1,5 +1,3 @@
-STATUS: DONE
-
 # EightCount (iOS dance-practice app) — progress
 
 App lives in `eightcount/`. Generate the Xcode project with `xcodegen generate` in that folder
@@ -17,8 +15,18 @@ App lives in `eightcount/`. Generate the Xcode project with `xcodegen generate` 
 - [x] Independent review pass of the whole codebase; fixes applied
 - [x] README: setup on Mac, free vs paid account, permissions, Check on Mac, Decisions, Next steps
 
-## In progress
-- Nothing.
+## Session 2 scope (in progress)
+User asked for (subagents must use model "sonnet" to save tokens):
+1. Record yourself (front camera, no mic) while the tutorial plays; live side-by-side or ghost overlay.
+2. Compare screen: landscape = you LEFT / tutorial RIGHT, portrait = you TOP / tutorial BOTTOM; synced, audio from tutorial.
+3. On-device AI analysis (Vision body pose + Apple Foundation Models tips; user has iPhone 15 Pro+).
+4. Liquid Glass (iOS 26+ APIs, guarded so iOS 17 still works).
+
+- [ ] Foundation (me): Take model, AnalysisReport, TakeTiming, TakeStore, OrientationLock, Glass styling, Info.plist camera key
+- [ ] Recording (sonnet agent): Recording/
+- [ ] Compare (sonnet agent): Compare/
+- [ ] Analysis (sonnet agent): Analysis/
+- [ ] Integration in ProjectDetailView (me), review (sonnet agent), README update
 
 ## Next step
 - On the Mac: `cd eightcount && xcodegen generate && open EightCount.xcodeproj`, build, and fix any
