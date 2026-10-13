@@ -13,15 +13,13 @@ App lives in `eightcount/`. Generate the Xcode project with `xcodegen generate` 
 - [x] README draft (eightcount/README.md) — "Check on Mac" and "Decisions" placeholders still to fill
 - [x] Root README links to the app
 
-## In progress
+## Done (parallel parts)
 - [x] Playback DONE (Playback/PlayerController, VideoSurface, PlaybackControlsView, FineScrubber)
-- 8-count grid UI (tempo sheet + tap tempo, count list, note editor, FrameGrabber) — subagent
+- [x] 8-count grid DONE (TempoTapper, TempoSetupSheet, CountListView, CountRowView, NoteEditorSheet, NoteStore, SnapshotViewer, FrameGrabber)
 - [x] Export/import DONE (Transfer/ProjectArchive.swift, ShareSheet, ExportProjectButton)
-  NOTE: ProjectListView already calls `ProjectArchive.importProject(from:into:)`, so the
-  project does not compile until Transfer/ProjectArchive.swift exists.
 
 ## Next step
-- Wait for / finish the three parts above, check them against ProjectDetailView's calls.
+- Independent review pass of the whole codebase (subagent) for API mistakes / compile errors; apply fixes.
 - Fill README placeholders <!-- CHECK_ON_MAC --> and <!-- DECISIONS -->, then one independent review pass.
 
 ## Open problems
