@@ -40,19 +40,26 @@ struct CountGrid: Equatable {
         min(start(of: index + 1), duration)
     }
 
+    /// A tiny tolerance (0.1 ms). After jumping to the start of an 8-count,
+    /// rounding in the math and in the video's time stamps can leave the
+    /// playhead a hair *before* the start; this still counts it as the new one.
+    private static let boundaryTolerance = 0.0001
+
     /// The 8-count playing at `time`, or nil before count 1 / without BPM.
     func index(at time: Double) -> Int? {
         let count = numberOfEightCounts
+        let t = time + Self.boundaryTolerance
         // No 8-counts at all (e.g. count 1 is after the end of the video).
-        guard isValid, count > 0, time.isFinite, time >= offset else { return nil }
-        let i = Int(floor((time - offset) / eightCountDuration))
+        guard isValid, count > 0, time.isFinite, t >= offset else { return nil }
+        let i = Int(floor((t - offset) / eightCountDuration))
         return min(i, count - 1)
     }
 
     /// The count (1...8) within its 8-count at `time`, or nil before count 1.
     func beat(at time: Double) -> Int? {
-        guard isValid, time.isFinite, time >= offset else { return nil }
-        let intoEight = (time - offset).truncatingRemainder(dividingBy: eightCountDuration)
+        let t = time + Self.boundaryTolerance
+        guard isValid, time.isFinite, t >= offset else { return nil }
+        let intoEight = (t - offset).truncatingRemainder(dividingBy: eightCountDuration)
         return min(Int(floor(intoEight / beatDuration)) + 1, 8)
     }
 }

@@ -109,7 +109,7 @@ struct ProjectDetailView: View {
                 PlaybackControlsView(
                     controller: controller,
                     countLabel: countLabel,
-                    onSnapshot: takeSnapshot
+                    onSnapshot: { takeSnapshot() }
                 )
                 .padding(.vertical, 8)
 
@@ -121,8 +121,8 @@ struct ProjectDetailView: View {
                     currentIndex: currentIndex,
                     loopedIndex: controller.isLooping ? controller.loopedEightCount : nil,
                     followPlayback: followPlayback && controller.isPlaying,
-                    onJump: jump(to:),
-                    onToggleLoop: toggleLoop(_:),
+                    onJump: { jump(to: $0) },
+                    onToggleLoop: { toggleLoop($0) },
                     onEdit: { editing = EditTarget(id: $0) },
                     onSetupTempo: { showTempo = true }
                 )
@@ -274,7 +274,10 @@ struct ProjectDetailView: View {
                                       to: project, context: modelContext)
                 snapshotCount += 1
                 withAnimation(.easeOut(duration: 0.05)) { flash = true }
-                withAnimation(.easeIn(duration: 0.35).delay(0.08)) { flash = false }
+                // Wait a moment before fading out; setting it back in the same
+                // instant would cancel the flash before it's ever drawn.
+                try? await Task.sleep(for: .milliseconds(80))
+                withAnimation(.easeIn(duration: 0.35)) { flash = false }
             } catch {
                 alertMessage = "Couldn't grab this frame: \(error.localizedDescription)"
             }

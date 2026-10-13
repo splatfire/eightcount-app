@@ -82,13 +82,15 @@ struct ProjectListView: View {
         } message: { _ in
             Text("This deletes the project, its notes, its snapshots and its copy of the video. This can't be undone.")
         }
+        // `presenting:` hands the project to the buttons, so Save still knows
+        // which project it is even after the alert has started closing.
         .alert("Rename Project", isPresented: Binding(
             get: { projectToRename != nil },
             set: { if !$0 { projectToRename = nil } }
-        )) {
+        ), presenting: projectToRename) { project in
             TextField("Title", text: $renameTitle)
             TextField("Section", text: $renameSection)
-            Button("Save") { saveRename() }
+            Button("Save") { saveRename(project) }
             Button("Cancel", role: .cancel) {}
         }
         .alert("Something went wrong", isPresented: Binding(
@@ -165,8 +167,7 @@ struct ProjectListView: View {
         projectToRename = project
     }
 
-    private func saveRename() {
-        guard let project = projectToRename else { return }
+    private func saveRename(_ project: Project) {
         let title = renameTitle.trimmingCharacters(in: .whitespaces)
         if !title.isEmpty { project.title = title }
         project.section = renameSection.trimmingCharacters(in: .whitespaces)

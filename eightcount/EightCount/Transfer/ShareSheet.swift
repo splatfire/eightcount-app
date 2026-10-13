@@ -3,6 +3,7 @@ import UIKit
 
 /// The standard iOS share sheet (AirDrop, Messages, Save to Files, ...)
 /// wrapped for SwiftUI. Show it inside `.sheet`.
+@MainActor
 struct ShareSheet: UIViewControllerRepresentable {
     /// What to share, e.g. `[fileURL]`.
     let items: [Any]
