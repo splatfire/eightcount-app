@@ -46,8 +46,7 @@ struct ProjectListView: View {
                     Button {
                         showNewProject = true
                     } label: {
-                        Label("New project", systemImage: "plus.circle.fill")
-                            .font(.title2)
+                        Label("New project", systemImage: "plus")
                     }
                 }
             }
@@ -109,58 +108,80 @@ struct ProjectListView: View {
 
     // MARK: - Subviews
 
+    /// One card per project (each project is its own list section, so the
+    /// system draws the rounded card, the chevron and the spacing for us).
     private var list: some View {
         List {
             ForEach(projects) { project in
-                NavigationLink(value: project) {
-                    ProjectRow(project: project)
-                }
-                .swipeActions(edge: .trailing) {
-                    Button(role: .destructive) {
-                        projectToDelete = project
-                    } label: {
-                        Label("Delete", systemImage: "trash")
+                Section {
+                    NavigationLink(value: project) {
+                        ProjectRow(project: project)
                     }
-                    Button {
-                        startRename(project)
-                    } label: {
-                        Label("Rename", systemImage: "pencil")
+                    .listRowBackground(Theme.surface)
+                    .listRowInsets(EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12))
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            projectToDelete = project
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                        Button {
+                            startRename(project)
+                        } label: {
+                            Label("Rename", systemImage: "pencil")
+                        }
+                        .tint(.gray)
                     }
-                    .tint(.gray)
-                }
-                .contextMenu {
-                    Button {
-                        startRename(project)
-                    } label: {
-                        Label("Rename", systemImage: "pencil")
-                    }
-                    Button(role: .destructive) {
-                        projectToDelete = project
-                    } label: {
-                        Label("Delete", systemImage: "trash")
+                    .contextMenu {
+                        Button {
+                            startRename(project)
+                        } label: {
+                            Label("Rename", systemImage: "pencil")
+                        }
+                        Button(role: .destructive) {
+                            projectToDelete = project
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
                 }
             }
         }
         .listStyle(.insetGrouped)
+        .listSectionSpacing(.compact)
+        .scrollContentBackground(.hidden)
+        .background(Theme.background)
     }
 
     private var emptyState: some View {
-        VStack(spacing: 24) {
-            ContentUnavailableView(
-                "No projects yet",
-                systemImage: "figure.dance",
-                description: Text("Create a project for each song or section you're learning.")
-            )
+        VStack(spacing: Theme.spacingL) {
+            Spacer()
+            Image(systemName: "figure.dance")
+                .font(.system(size: 40, weight: .regular))
+                .foregroundStyle(Theme.accent)
+                .frame(width: 96, height: 96)
+                .background(Circle().fill(Theme.accent.opacity(0.14)))
+            VStack(spacing: Theme.spacingS) {
+                Text("Learn your first dance")
+                    .font(.title2.weight(.bold))
+                Text("Add a tutorial video, split it into 8-counts and practice one step at a time.")
+                    .font(.body)
+                    .foregroundStyle(Theme.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Button {
                 showNewProject = true
             } label: {
                 Label("New Project", systemImage: "plus")
             }
-            .buttonStyle(.big(isOn: true))
-            .padding(.horizontal, 40)
+            .buttonStyle(AccentCapsuleButtonStyle())
+            Spacer()
             Spacer()
         }
+        .padding(.horizontal, 40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.background)
     }
 
     // MARK: - Actions
@@ -190,35 +211,48 @@ struct ProjectListView: View {
     }
 }
 
-/// One row in the project list.
+/// One row in the project list: video picture, title, one quiet detail line.
 private struct ProjectRow: View {
     let project: Project
 
     var body: some View {
         HStack(spacing: 14) {
-            Image(systemName: project.videoFileName == nil ? "video.slash" : "play.rectangle.fill")
-                .font(.title2)
-                .foregroundStyle(project.videoFileName == nil ? Theme.secondaryText : Theme.accent)
-                .frame(width: 36)
+            VideoThumbnail(url: project.videoURL, cornerRadius: 10)
+                .frame(width: 56, height: 72)
             VStack(alignment: .leading, spacing: 4) {
                 Text(project.title)
                     .font(.headline)
-                HStack(spacing: 8) {
-                    if !project.section.isEmpty {
-                        Text(project.section)
-                    }
-                    if project.bpm > 0 {
-                        Text("\(Int(project.bpm.rounded())) BPM")
-                    }
-                    let noteCount = project.notes.filter { !$0.isEmpty }.count
-                    if noteCount > 0 {
-                        Text("\(noteCount) notes")
-                    }
+                    .lineLimit(2)
+                let detail = detailLine
+                if !detail.isEmpty {
+                    Text(detail)
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.secondaryText)
+                        .lineLimit(2)
                 }
-                .font(.subheadline)
-                .foregroundStyle(Theme.secondaryText)
             }
+            Spacer(minLength: 0)
         }
-        .padding(.vertical, 8)
+        .frame(minHeight: 72)
+    }
+
+    /// "chorus · 120 BPM · 5 notes · 2 takes"
+    private var detailLine: String {
+        var parts: [String] = []
+        if !project.section.isEmpty {
+            parts.append(project.section)
+        }
+        if project.bpm > 0 {
+            parts.append("\(Int(project.bpm.rounded())) BPM")
+        }
+        let noteCount = project.notes.filter { !$0.isEmpty }.count
+        if noteCount > 0 {
+            parts.append("\(noteCount) \(noteCount == 1 ? "note" : "notes")")
+        }
+        let takeCount = project.takes.count
+        if takeCount > 0 {
+            parts.append("\(takeCount) \(takeCount == 1 ? "take" : "takes")")
+        }
+        return parts.joined(separator: " · ")
     }
 }
