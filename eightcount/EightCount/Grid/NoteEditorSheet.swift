@@ -60,8 +60,8 @@ struct NoteEditorSheet: View {
                 }
             }
         }
-        .onAppear(perform: loadNote)
-        .onDisappear(perform: finish)
+        .onAppear { loadNote() }
+        .onDisappear { finish() }
         // A normal sheet (not full-screen), so this editor stays "on screen"
         // underneath and its onDisappear doesn't run early.
         .sheet(item: $viewingSnapshot) { snapshot in

@@ -92,7 +92,7 @@ struct SnapshotViewer: View {
             }
         }
         .preferredColorScheme(.dark)
-        .onAppear(perform: loadOnce)
+        .onAppear { loadOnce() }
         .confirmationDialog(
             "Delete this snapshot?",
             isPresented: $confirmDelete,
