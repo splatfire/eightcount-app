@@ -86,10 +86,14 @@ final class EightCountUITests: XCTestCase {
 
         // 7. My Takes → Compare
         let takesItem = app.buttons["My Takes (1)"].firstMatch
-        for _ in 0..<3 where !(takesItem.exists && takesItem.isHittable) {
-            app.buttons["More"].firstMatch.tap()
-            _ = takesItem.waitForExistence(timeout: 3)
-            sleep(1)
+        let more = app.buttons["More"].firstMatch
+        let hittable = NSPredicate(format: "exists == true AND hittable == true")
+        for attempt in 0..<3 {
+            if more.exists && more.isHittable { more.tap() }
+            let wait = XCTNSPredicateExpectation(predicate: hittable, object: takesItem)
+            if XCTWaiter().wait(for: [wait], timeout: 5) == .completed { break }
+            // Menu didn't open properly: close whatever is open and retry.
+            if attempt < 2 { app.tap(); sleep(1) }
         }
         XCTAssertTrue(takesItem.isHittable, "My Takes menu item not tappable")
         takesItem.tap()
