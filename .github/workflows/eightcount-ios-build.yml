@@ -106,16 +106,40 @@ jobs:
           echo "UDID=$UDID" >> "$GITHUB_ENV"
           xcrun simctl list devices | grep "$UDID"
 
-      - name: Run UI test
+      - name: Boot the simulator (and wait until it is fully up)
+        run: |
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          sleep 20
+
+      - name: Build for testing
         run: |
           set -o pipefail
-          mkdir -p shots
-          TEST_RUNNER_SEED_VIDEO="$PWD/demo.mp4" TEST_RUNNER_SHOTS_DIR="$PWD/shots" \
-          xcodebuild test \
+          xcodebuild build-for-testing \
             -project EightCount.xcodeproj -scheme EightCount \
-            -destination "id=$UDID" -resultBundlePath ui.xcresult \
-            2>&1 | tee test.log | grep -E "error:|Test Case|TEST (SUCCEEDED|FAILED)|XCTAssert|Not found|crash" || true
-          grep -q "TEST SUCCEEDED" test.log
+            -destination "id=$UDID" -derivedDataPath build/test \
+            2>&1 | tee build-test.log | grep -E "error:|TEST BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "TEST BUILD SUCCEEDED" build-test.log
+
+      - name: Run UI test (one retry if the test runner fails to start)
+        run: |
+          mkdir -p shots
+          for attempt in 1 2; do
+            echo "=== Attempt $attempt"
+            TEST_RUNNER_SEED_VIDEO="$PWD/demo.mp4" TEST_RUNNER_SHOTS_DIR="$PWD/shots" \
+            xcodebuild test-without-building \
+              -project EightCount.xcodeproj -scheme EightCount \
+              -destination "id=$UDID" -derivedDataPath build/test \
+              -resultBundlePath "ui-$attempt.xcresult" \
+              > "test-$attempt.log" 2>&1 || true
+            grep -E "error:|Test Case|TEST (EXECUTE )?(SUCCEEDED|FAILED)|XCTAssert|Not found|crash|bootstrapping" "test-$attempt.log" || true
+            if grep -qE "TEST (EXECUTE )?SUCCEEDED" "test-$attempt.log"; then exit 0; fi
+            # Only retry when the runner never got to our test.
+            grep -q "bootstrapping" "test-$attempt.log" || exit 1
+            xcrun simctl shutdown "$UDID" || true
+            xcrun simctl boot "$UDID"; xcrun simctl bootstatus "$UDID" -b; sleep 20
+          done
+          exit 1
 
       - name: Crash reports (if any)
         if: failure()
@@ -142,5 +166,5 @@ jobs:
           name: ui-screenshots
           path: |
             eightcount/shots
-            eightcount/ui.xcresult
+            eightcount/ui-*.xcresult
           if-no-files-found: ignore
