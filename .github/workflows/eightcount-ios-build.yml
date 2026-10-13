@@ -1,0 +1,62 @@
+# Compiles the EightCount iOS app on GitHub's macOS machines (free for
+# public repos), so build errors show up without a Mac. No signing: this
+# only checks that the code compiles. Installing on an iPhone still happens
+# in Xcode on your Mac (see eightcount/README.md).
+name: EightCount iOS build
+
+on:
+  push:
+    branches: [claude/nice-bardeen-84bg5p]
+    paths:
+      - "eightcount/**"
+      - ".github/workflows/eightcount-ios-build.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Xcode 27 (GitHub image is in public preview).
+          - name: Xcode 27
+            runner: xcode-27
+          # Xcode 26 (default on macos-26), to make sure older setups build too.
+          - name: Xcode 26
+            runner: macos-26
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: eightcount
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version && swift --version
+
+      - name: Install XcodeGen
+        run: command -v xcodegen || brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build for iPhone (no signing)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project EightCount.xcodeproj \
+            -scheme EightCount \
+            -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee build.log
+
+      - name: Error and warning summary
+        if: always()
+        run: |
+          echo "=== ERRORS ==="
+          grep -E "error:" build.log | sort -u || true
+          echo "=== WARNINGS (first 80) ==="
+          grep -E "warning:" build.log | sort -u | head -80 || true

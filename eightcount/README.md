@@ -14,51 +14,7 @@ tutorial and dance-practice videos:
   lyric cue.
 - **Pose snapshots**: grab the current frame and attach it to the 8-count.
 - **Projects**: one per song or section. Create, rename, delete (always confirmed).
-- **Recording, compare & AI analysis**
-- **AI runs fully on the iPhone** (your choice). Vision body tracking plus
-  Apple's Foundation Models framework. No API key, no cost, nothing uploaded.
-- **Recordings have no sound** (no microphone needed). The compare screen
-  plays the tutorial's music.
-- **What gets recorded:** recording starts at the current video position,
-  at the current speed and mirror setting. If an A-B loop or a looped
-  8-count is active, it records exactly that part and stops at its end.
-- **A 3-second countdown** after you press Record. The recording keeps it,
-  and the app remembers where the tutorial started, so the two line up.
-- **Sync fine-tuning.** The camera starts with a small delay that differs
-  from phone to phone, so the compare screen has a "Sync" panel to nudge
-  your video by ±1 frame or ±0.1 s. The nudge is saved with the take.
-- **The recorded file is not mirrored** (it's how others see you). The
-  compare screen shows it **mirrored by default**, like a mirror, and you
-  can switch that off.
-- **The AI compares what you see on screen.** If you look the same as the
-  tutorial on screen (with the current mirror settings), it counts as a
-  match. So the mirror toggles affect the analysis, and the app tells you
-  when you should re-analyze.
-- **In group videos the AI follows the biggest (closest) dancer** in each
-  frame. Choosing a specific dancer is in Next steps.
-- **Timing sign:** "late" means you do the move after the tutorial does.
-  Detection works in steps of 0.1 s, within ±0.6 s.
-- **The latest analysis is saved with each take.** Re-analyzing replaces it.
-- **Takes are not part of the notes export** (they're videos). Deleting a
-  project or a take always asks first, and deletes the video files too.
-
-**Liquid Glass (iOS 26 / 27)**
-- **Liquid Glass on iOS 26+, solid look on iOS 17–25.** The deployment
-  target stays iOS 17. The glass code is guarded twice: compiled only with
-  Xcode 26+ (`#if compiler(>=6.2)`), and used only on iOS 26+ (`#available`).
-- **Glass parts:** all big buttons, the 8-count loop/edit buttons, and the
-  control bars that float over video. Navigation bars, toolbars, sheets and
-  menus get glass automatically from iOS.
-- **Built on the iOS 26 APIs** (`glassEffect`, `GlassEffectContainer`), which
-  iOS 27 still uses. Reportedly, iOS 27 makes the glass less transparent and
-  adds a user setting for it. Both would apply to this app automatically.
-  Also reportedly, Xcode 27 no longer lets apps opt out of Liquid Glass; this
-  app doesn't try to. These iOS 27 details come from secondary sources
-  ([Wikipedia](https://en.wikipedia.org/wiki/Liquid_Glass),
-  [migration write-up](https://ecorpit.com/ios-27-liquid-glass-xcode-27-migration-guide-2026/)),
-  not Apple's own docs, so I didn't use any iOS-27-only API.
-
-**Export / import** a project's notes and snapshots (not the video) as one
+- **Export / import** a project's notes and snapshots (not the video) as one
   file, so you can back them up or send them to someone in your group.
 - **Record yourself** with the front camera while the tutorial plays. You see
   yourself live next to the tutorial, or the tutorial as a see-through
@@ -484,6 +440,50 @@ Change any of them later.
   the database with SwiftData's "external storage".
 - **Deleting anything always asks first**: projects, snapshots, and the
   current video when you replace it.
+
+**Recording, compare & AI analysis**
+- **AI runs fully on the iPhone** (your choice). Vision body tracking plus
+  Apple's Foundation Models framework. No API key, no cost, nothing uploaded.
+- **Recordings have no sound** (no microphone needed). The compare screen
+  plays the tutorial's music.
+- **What gets recorded:** recording starts at the current video position,
+  at the current speed and mirror setting. If an A-B loop or a looped
+  8-count is active, it records exactly that part and stops at its end.
+- **A 3-second countdown** after you press Record. The recording keeps it,
+  and the app remembers where the tutorial started, so the two line up.
+- **Sync fine-tuning.** The camera starts with a small delay that differs
+  from phone to phone, so the compare screen has a "Sync" panel to nudge
+  your video by ±1 frame or ±0.1 s. The nudge is saved with the take.
+- **The recorded file is not mirrored** (it's how others see you). The
+  compare screen shows it **mirrored by default**, like a mirror, and you
+  can switch that off.
+- **The AI compares what you see on screen.** If you look the same as the
+  tutorial on screen (with the current mirror settings), it counts as a
+  match. So the mirror toggles affect the analysis, and the app tells you
+  when you should re-analyze.
+- **In group videos the AI follows the biggest (closest) dancer** in each
+  frame. Choosing a specific dancer is in Next steps.
+- **Timing sign:** "late" means you do the move after the tutorial does.
+  Detection works in steps of 0.1 s, within ±0.6 s.
+- **The latest analysis is saved with each take.** Re-analyzing replaces it.
+- **Takes are not part of the notes export** (they're videos). Deleting a
+  project or a take always asks first, and deletes the video files too.
+
+**Liquid Glass (iOS 26 / 27)**
+- **Liquid Glass on iOS 26+, solid look on iOS 17–25.** The deployment
+  target stays iOS 17. The glass code is guarded twice: compiled only with
+  Xcode 26+ (`#if compiler(>=6.2)`), and used only on iOS 26+ (`#available`).
+- **Glass parts:** all big buttons, the 8-count loop/edit buttons, and the
+  control bars that float over video. Navigation bars, toolbars, sheets and
+  menus get glass automatically from iOS.
+- **Built on the iOS 26 APIs** (`glassEffect`, `GlassEffectContainer`), which
+  iOS 27 still uses. Reportedly, iOS 27 makes the glass less transparent and
+  adds a user setting for it. Both would apply to this app automatically.
+  Also reportedly, Xcode 27 no longer lets apps opt out of Liquid Glass; this
+  app doesn't try to. These iOS 27 details come from secondary sources
+  ([Wikipedia](https://en.wikipedia.org/wiki/Liquid_Glass),
+  [migration write-up](https://ecorpit.com/ios-27-liquid-glass-xcode-27-migration-guide-2026/)),
+  not Apple's own docs, so I didn't use any iOS-27-only API.
 
 **Export / import**
 - **The file format is a single `.json` file** (named
