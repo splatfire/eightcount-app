@@ -25,6 +25,18 @@ struct ProjectDetailView: View {
     @State private var flash = false
     @State private var alertMessage: String?
 
+    // Recording yourself and comparing (see Recording/ and Compare/).
+    @State private var showRecord = false
+    @State private var showTakes = false
+    @State private var comparing: Take?
+    /// Actions to run once a sheet/cover has finished closing (SwiftUI can't
+    /// open a new full-screen cover while another one is still closing).
+    @State private var pendingCompare: Take?
+    @State private var pendingRecord = false
+    /// Which video file the player has loaded, so coming back from the
+    /// record/compare screens doesn't reload it (and lose your place).
+    @State private var loadedFileName: String?
+
     /// The 8-count layout for the current BPM / offset / video length.
     private var grid: CountGrid {
         CountGrid(bpm: project.bpm, offset: project.offset, duration: controller.duration)
@@ -49,7 +61,9 @@ struct ProjectDetailView: View {
         .toolbar { toolbarContent }
         // (Re)load the video whenever the project's video file changes.
         .task(id: project.videoFileName) {
-            guard hasVideo, let url = project.videoURL else { return }
+            guard hasVideo, let url = project.videoURL,
+                  loadedFileName != project.videoFileName else { return }
+            loadedFileName = project.videoFileName
             await controller.load(url: url)
         }
         .onDisappear { controller.tearDown() }
@@ -58,6 +72,25 @@ struct ProjectDetailView: View {
         }
         .sheet(isPresented: $showTempo) { tempoSheet }
         .sheet(isPresented: $showReplaceSheet) { replaceVideoSheet }
+        .sheet(isPresented: $showTakes, onDismiss: runPendingActions) {
+            TakesListView(
+                project: project,
+                onOpen: { take in
+                    pendingCompare = take
+                    showTakes = false
+                },
+                onRecordNew: {
+                    pendingRecord = true
+                    showTakes = false
+                }
+            )
+        }
+        .fullScreenCover(isPresented: $showRecord, onDismiss: runPendingActions) {
+            recordView
+        }
+        .fullScreenCover(item: $comparing) { take in
+            CompareView(project: project, take: take, tutorialMirrored: controller.isMirrored)
+        }
         .confirmationDialog(
             "Replace the video?",
             isPresented: $showReplaceConfirm,
@@ -174,6 +207,14 @@ struct ProjectDetailView: View {
             }
         }
         ToolbarItem(placement: .topBarTrailing) {
+            Button {
+                startRecording()
+            } label: {
+                Label("Record Yourself", systemImage: "record.circle")
+            }
+            .disabled(!hasVideo)
+        }
+        ToolbarItem(placement: .topBarTrailing) {
             ExportProjectButton(project: project)
         }
         ToolbarItem(placement: .topBarTrailing) {
@@ -182,6 +223,11 @@ struct ProjectDetailView: View {
                     showTempo = true
                 } label: {
                     Label("Tempo & Count 1…", systemImage: "metronome")
+                }
+                Button {
+                    showTakes = true
+                } label: {
+                    Label("My Takes (\(project.takes.count))", systemImage: "person.2.crop.square.stack")
                 }
                 Toggle(isOn: $followPlayback) {
                     Label("Follow Playback in List", systemImage: "list.bullet.below.rectangle")
@@ -241,6 +287,44 @@ struct ProjectDetailView: View {
             }
         }
         .presentationDetents([.medium])
+    }
+
+    // MARK: - Record & compare
+
+    /// The record screen. It starts where you are in the video, at your
+    /// current speed and mirror setting. If an A-B loop (or a looped
+    /// 8-count) is on, it records exactly that part.
+    private var recordView: some View {
+        let looping = controller.isLooping
+        let start = looping ? (controller.loopStart ?? controller.currentTime) : controller.currentTime
+        let end = looping ? controller.loopEnd : nil
+        return RecordView(
+            project: project,
+            startTime: start,
+            endTime: end,
+            rate: Double(controller.rate),
+            tutorialMirrored: controller.isMirrored,
+            onFinished: { take in
+                pendingCompare = take   // opened after the cover has closed
+                showRecord = false
+            }
+        )
+    }
+
+    private func startRecording() {
+        controller.pause()
+        showRecord = true
+    }
+
+    /// Runs what was requested from inside a sheet/cover once it is gone.
+    private func runPendingActions() {
+        if let take = pendingCompare {
+            pendingCompare = nil
+            comparing = take
+        } else if pendingRecord {
+            pendingRecord = false
+            startRecording()
+        }
     }
 
     // MARK: - Actions

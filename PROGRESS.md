@@ -22,11 +22,12 @@ User asked for (subagents must use model "sonnet" to save tokens):
 3. On-device AI analysis (Vision body pose + Apple Foundation Models tips; user has iPhone 15 Pro+).
 4. Liquid Glass (iOS 26+ APIs, guarded so iOS 17 still works).
 
-- [ ] Foundation (me): Take model, AnalysisReport, TakeTiming, TakeStore, OrientationLock, Glass styling, Info.plist camera key
+- [x] Foundation (me): Take model, AnalysisReport, TakeTiming, TakeStore, OrientationLock, Glass styling, Info.plist camera key
 - [ ] Recording (sonnet agent): Recording/
 - [ ] Compare (sonnet agent): Compare/
 - [ ] Analysis (sonnet agent): Analysis/
-- [ ] Integration in ProjectDetailView (me), review (sonnet agent), README update
+- [x] Integration in ProjectDetailView (record button, My Takes, compare cover)
+- [ ] Review (sonnet agent), README update
 
 ## Next step
 - On the Mac: `cd eightcount && xcodegen generate && open EightCount.xcodeproj`, build, and fix any
