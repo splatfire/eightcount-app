@@ -50,9 +50,15 @@ User asked for (subagents must use model "sonnet" to save tokens):
 - First UI-test attempt failed only because the XCTest runner didn't bootstrap on CI -> fixed by
   booting the simulator first + build-for-testing + one retry.
 
+- `setup-mac.sh --install` now builds + signs (auto-detects Team ID, -allowProvisioningUpdates),
+  installs and launches on the USB iPhone via `xcrun devicectl`; stops with clear instructions for
+  Apple-ID sign-in / Trust / Developer Mode. CI job "setup-mac.sh (Xcode 27)" verifies it on macOS
+  (green, run 38443989478). Added eightcount/CLAUDE.md for a local Claude Code session.
+- This cloud session can't reach the Mac: the device install itself is run by the user.
+
 ## Next step
-- User, on the Mac: clone/pull branch `claude/nice-bardeen-84bg5p`, run `eightcount/setup-mac.sh [TEAM_ID] [BUNDLE_ID]`,
-  pick the iPhone, Run. Then test on device: camera recording, real analysis, Apple Intelligence tips.
+- User, on the Mac: clone branch `claude/nice-bardeen-84bg5p`, run `eightcount/setup-mac.sh --install`
+  (iPhone connected). Then test on device: camera recording, real analysis, Apple Intelligence tips.
 - Nice-to-haves: README → Next steps.
 
 ## Open problems
