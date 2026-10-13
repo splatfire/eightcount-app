@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 /// Sheet for creating a project: title, section and (optionally) a video.
+@MainActor
 struct NewProjectSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss

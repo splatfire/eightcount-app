@@ -3,6 +3,7 @@ import SwiftData
 import UniformTypeIdentifiers
 
 /// Home screen: all projects, newest first. Create, rename, delete, import.
+@MainActor
 struct ProjectListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Project.updatedAt, order: .reverse) private var projects: [Project]

@@ -9,6 +9,10 @@ App lives in `eightcount/`. Generate the Xcode project with `xcodegen generate` 
 - [x] VideoImportButtons (Photos + Files), NewProjectSheet, ProjectListView (create / rename / delete with confirmation)
 - [x] CountGrid math (BPM + offset -> 8-counts), Theme / BigButtonStyle
 
+- [x] Views/ProjectDetailView.swift written against the agreed APIs (needs re-check once parts land)
+- [x] README draft (eightcount/README.md) — "Check on Mac" and "Decisions" placeholders still to fill
+- [x] Root README links to the app
+
 ## In progress
 - Playback (PlayerController, video view, controls, fine scrubber) — subagent
 - 8-count grid UI (tempo sheet + tap tempo, count list, note editor, FrameGrabber) — subagent
@@ -17,9 +21,8 @@ App lives in `eightcount/`. Generate the Xcode project with `xcodegen generate` 
   project does not compile until Transfer/ProjectArchive.swift exists.
 
 ## Next step
-- Wait for / finish the three parts above, then write the real `Views/ProjectDetailView.swift`
-  that wires them together (video top, controls, scrollable 8-count list).
-- Then README.md (eightcount/README.md), then one independent review pass.
+- Wait for / finish the three parts above, check them against ProjectDetailView's calls.
+- Fill README placeholders <!-- CHECK_ON_MAC --> and <!-- DECISIONS -->, then one independent review pass.
 
 ## Open problems
 - Nothing can be compiled here (Linux). Everything must be checked in Xcode on the Mac.
