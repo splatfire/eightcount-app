@@ -204,18 +204,24 @@ struct AnalysisView: View {
     let takeMirrored: Bool
     /// Called with a TUTORIAL time (seconds) the compare screen should seek to.
     let onJump: (Double) -> Void
+    /// "Show me finding #i on the video": the findings and the index to start at.
+    let onCoach: ([AnalysisReport.Finding], Int) -> Void
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @StateObject private var runner = AnalysisRunner()
     @State private var report: AnalysisReport?
+    @State private var coachNotesOpen = false
 
-    init(project: Project, take: Take, tutorialMirrored: Bool, takeMirrored: Bool, onJump: @escaping (Double) -> Void) {
+    init(project: Project, take: Take, tutorialMirrored: Bool, takeMirrored: Bool,
+         onJump: @escaping (Double) -> Void,
+         onCoach: @escaping ([AnalysisReport.Finding], Int) -> Void = { _, _ in }) {
         self.project = project
         self.take = take
         self.tutorialMirrored = tutorialMirrored
         self.takeMirrored = takeMirrored
         self.onJump = onJump
+        self.onCoach = onCoach
         // Show a saved result right away.
         _report = State(initialValue: take.analysisReport)
     }
@@ -224,12 +230,13 @@ struct AnalysisView: View {
         ZStack {
             Theme.background.ignoresSafeArea()
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 16) {
                     header
                     content
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.top, 8)
+                .padding(.bottom, 24)
             }
         }
         .preferredColorScheme(.dark)
@@ -240,22 +247,23 @@ struct AnalysisView: View {
     // MARK: Pieces
 
     private var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
                 Label("AI dance check", systemImage: "sparkles")
-                    .font(.system(.title2, design: .rounded).weight(.bold))
+                    .font(.system(.title3, design: .rounded).weight(.bold))
                 Text(project.displayTitle)
-                    .font(.subheadline)
+                    .font(.caption)
                     .foregroundStyle(Theme.secondaryText)
+                    .lineLimit(1)
             }
             Spacer(minLength: 8)
             Button {
                 dismiss()
             } label: {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.title)
+                    .font(.title2)
                     .foregroundStyle(Theme.secondaryText)
-                    .frame(width: Theme.tapHeight, height: Theme.tapHeight)
+                    .frame(width: Theme.controlHeight, height: Theme.controlHeight)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -355,7 +363,7 @@ struct AnalysisView: View {
 
     // The result.
     private func resultsSection(_ report: AnalysisReport) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 16) {
             if report.tutorialMirrored != tutorialMirrored || report.takeMirrored != takeMirrored {
                 Label("Mirror settings changed — analyze again for accurate results",
                       systemImage: "arrow.left.and.right")
@@ -364,13 +372,14 @@ struct AnalysisView: View {
                     .analysisCard()
             }
 
-            scoreHeader(report)
+            summaryRow(report)
 
+            if !report.topFindings.isEmpty {
+                showMeButton(report)
+                findingsSection(report)
+            }
             if !report.coachText.isEmpty {
                 coachCard(report)
-            }
-            if !report.topFindings.isEmpty {
-                findingsSection(report)
             }
             if !report.segments.isEmpty {
                 segmentsSection(report)
@@ -390,111 +399,183 @@ struct AnalysisView: View {
         }
     }
 
-    private func scoreHeader(_ report: AnalysisReport) -> some View {
-        VStack(spacing: 12) {
-            ScoreRing(score: report.overallScore)
-            Text(report.timingHeadline)
-                .font(.system(.headline, design: .rounded))
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-            Text("Your body was found in \(Int((report.poseCoverage * 100).rounded()))% of the frames.")
-                .font(.caption)
-                .foregroundStyle(Theme.secondaryText)
+    private func verdict(for score: Int) -> String {
+        if score >= 75 { return "Pretty close!" }
+        if score >= 50 { return "Getting there" }
+        return "Keep practicing"
+    }
+
+    /// Score ring, one-line verdict and the timing line.
+    private func summaryRow(_ report: AnalysisReport) -> some View {
+        HStack(alignment: .center, spacing: 14) {
+            ScoreRing(score: report.overallScore, size: 72)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(verdict(for: report.overallScore))
+                    .font(.system(.title3, design: .rounded).weight(.bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text(report.timingHeadline)
+                    .font(.footnote)
+                    .foregroundStyle(Theme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Body found in \(Int((report.poseCoverage * 100).rounded()))% of frames")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.secondaryText)
+            }
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// The big main action: see the tips drawn on the video.
+    private func showMeButton(_ report: AnalysisReport) -> some View {
+        Button {
+            onCoach(report.topFindings, 0)
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "play.fill")
+                Text("Show me on the video")
+            }
+            .font(.system(.headline, design: .rounded))
+            .foregroundStyle(.black)
+            .frame(maxWidth: .infinity, minHeight: 56)
+            .background(Capsule().fill(Theme.accent))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Show me on the video")
     }
 
     private func coachCard(_ report: AnalysisReport) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Your coach says")
-                .font(.system(.title3, design: .rounded).weight(.bold))
-            ForEach(coachLines(from: report.coachText)) { line in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    if line.isBullet {
-                        Text("•").foregroundStyle(Theme.accent)
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { coachNotesOpen.toggle() }
+            } label: {
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Coach's notes")
+                            .font(.system(.headline, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text(report.coachSource == CoachWriter.appleIntelligenceSource ? "Tips by Apple Intelligence" : "Built-in tips")
+                            .font(.caption)
+                            .foregroundStyle(Theme.secondaryText)
                     }
-                    Text(styled(line.text))
-                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    Image(systemName: coachNotesOpen ? "chevron.up" : "chevron.down")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.secondaryText)
+                }
+                .frame(minHeight: Theme.controlHeight - 12)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Coach's notes")
+            .accessibilityValue(coachNotesOpen ? "Expanded" : "Collapsed")
+
+            if coachNotesOpen {
+                ForEach(coachLines(from: report.coachText)) { line in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        if line.isBullet {
+                            Text("•").foregroundStyle(Theme.accent)
+                        }
+                        Text(styled(line.text))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
-            Text(report.coachSource == CoachWriter.appleIntelligenceSource ? "Tips by Apple Intelligence" : "Built-in tips")
-                .font(.caption)
-                .foregroundStyle(Theme.secondaryText)
         }
         .analysisCard()
     }
 
     private func findingsSection(_ report: AnalysisReport) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Work on these first")
+        let findings = report.topFindings
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("Top fixes")
                 .font(.system(.title3, design: .rounded).weight(.bold))
-            ForEach(report.topFindings) { finding in
-                Button {
-                    onJump(finding.time)
-                } label: {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(finding.bodyPart)
-                                .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                                .foregroundStyle(Theme.accent)
-                            Text(finding.message)
-                                .font(.system(.body, design: .rounded))
-                                .foregroundStyle(.white)
-                                .multilineTextAlignment(.leading)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Text(finding.whereText)
-                                .font(.caption)
-                                .foregroundStyle(Theme.secondaryText)
+            ForEach(Array(findings.enumerated()), id: \.element.id) { index, finding in
+                HStack(spacing: 10) {
+                    Button {
+                        onCoach(findings, index)
+                    } label: {
+                        HStack(alignment: .top, spacing: 12) {
+                            Text("\(index + 1)")
+                                .font(.system(.subheadline, design: .rounded).weight(.bold))
+                                .foregroundStyle(.black)
+                                .frame(width: 28, height: 28)
+                                .background(Circle().fill(Theme.accent))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(finding.bodyPart)
+                                    .font(.system(.caption, design: .rounded).weight(.bold))
+                                    .textCase(.uppercase)
+                                    .foregroundStyle(Theme.accent)
+                                Text(finding.message)
+                                    .font(.system(.headline, design: .rounded))
+                                    .foregroundStyle(.white)
+                                    .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Text(finding.whereText)
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.secondaryText)
+                            }
+                            Spacer(minLength: 0)
                         }
-                        Spacer(minLength: 8)
-                        Image(systemName: "play.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(Theme.secondaryText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
                     }
-                    .frame(maxWidth: .infinity, minHeight: Theme.tapHeight, alignment: .leading)
-                    .padding(14)
-                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.surface))
-                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Fix \(index + 1), \(finding.bodyPart). \(finding.message). \(finding.whereText)")
+
+                    Button {
+                        onCoach(findings, index)
+                    } label: {
+                        Image(systemName: "eye")
+                    }
+                    .buttonStyle(.round(size: 44))
+                    .accessibilityLabel("Show")
                 }
-                .buttonStyle(.plain)
+                .card()
             }
         }
     }
 
     private func segmentsSection(_ report: AnalysisReport) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(report.segments.first?.isEightCount == true ? "By 8-count" : "By section")
                 .font(.system(.title3, design: .rounded).weight(.bold))
-            ForEach(report.segments) { segment in
-                Button {
-                    onJump(segment.start)
-                } label: {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text(segment.label)
-                                .font(.system(.body, design: .rounded).weight(.semibold))
-                                .foregroundStyle(.white)
-                            Spacer()
-                            Text("\(segment.score)")
-                                .font(.system(.title3, design: .rounded).weight(.bold))
-                                .foregroundStyle(ScoreRing.color(for: segment.score))
-                        }
-                        ScoreBar(score: segment.score)
-                        if let first = segment.findings.first {
-                            Text(first.message)
-                                .font(.footnote)
-                                .foregroundStyle(Theme.secondaryText)
-                                .multilineTextAlignment(.leading)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+            VStack(spacing: 0) {
+                ForEach(Array(report.segments.enumerated()), id: \.element.id) { index, segment in
+                    if index > 0 {
+                        Divider().overlay(Theme.hairline)
                     }
-                    .frame(maxWidth: .infinity, minHeight: Theme.tapHeight, alignment: .leading)
-                    .padding(14)
-                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.surface))
-                    .contentShape(Rectangle())
+                    Button {
+                        onJump(segment.start)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 5) {
+                            HStack {
+                                Text(segment.label)
+                                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                                    .foregroundStyle(.white)
+                                Spacer()
+                                Text("\(segment.score)")
+                                    .font(.system(.headline, design: .rounded).weight(.bold))
+                                    .foregroundStyle(ScoreRing.color(for: segment.score))
+                            }
+                            ScoreBar(score: segment.score, height: 5)
+                            if let first = segment.findings.first {
+                                Text(first.message)
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.secondaryText)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, minHeight: Theme.controlHeight, alignment: .leading)
+                        .padding(.vertical, 8)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
+            .analysisCard()
         }
     }
 
@@ -534,10 +615,11 @@ struct AnalysisView: View {
 
 // MARK: - Small views
 
-/// Big circular score with a colored ring.
+/// Circular score with a colored ring.
 @MainActor
 private struct ScoreRing: View {
     let score: Int
+    var size: CGFloat = 72
 
     /// Red below 50, orange below 75, green from 75.
     static func color(for score: Int) -> Color {
@@ -549,21 +631,16 @@ private struct ScoreRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Theme.surfaceRaised, lineWidth: 14)
+                .stroke(Theme.surfaceRaised, lineWidth: size * 0.12)
             Circle()
                 .trim(from: 0, to: CGFloat(max(0, min(100, score))) / 100)
-                .stroke(Self.color(for: score), style: StrokeStyle(lineWidth: 14, lineCap: .round))
+                .stroke(Self.color(for: score), style: StrokeStyle(lineWidth: size * 0.12, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-            VStack(spacing: 0) {
-                Text("\(score)")
-                    .font(.system(size: 56, weight: .bold, design: .rounded))
-                Text("out of 100")
-                    .font(.caption)
-                    .foregroundStyle(Theme.secondaryText)
-            }
+            Text("\(score)")
+                .font(.system(size: size * 0.38, weight: .bold, design: .rounded))
+                .monospacedDigit()
         }
-        .frame(width: 160, height: 160)
-        .padding(.top, 4)
+        .frame(width: size, height: size)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Score \(score) out of 100")
     }
@@ -573,6 +650,7 @@ private struct ScoreRing: View {
 @MainActor
 private struct ScoreBar: View {
     let score: Int
+    var height: CGFloat = 8
 
     var body: some View {
         GeometryReader { geometry in
@@ -583,7 +661,7 @@ private struct ScoreBar: View {
                     .frame(width: geometry.size.width * CGFloat(max(0, min(100, score))) / 100)
             }
         }
-        .frame(height: 8)
+        .frame(height: height)
     }
 }
 

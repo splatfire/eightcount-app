@@ -132,6 +132,31 @@ enum PoseExtractor {
         return samples
     }
 
+    /// The dancer's pose in ONE frame of the video (nil if nobody is found).
+    /// `time` is in the video's own seconds. Used by the "show me" view.
+    static func pose(in url: URL, at time: Double) async -> PoseSample? {
+        guard time.isFinite else { return nil }
+        let asset = AVURLAsset(url: url)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 960, height: 960)
+        let tolerance = CMTime(seconds: 0.05, preferredTimescale: 600)
+        generator.requestedTimeToleranceBefore = tolerance
+        generator.requestedTimeToleranceAfter = tolerance
+
+        var seconds = max(0, time)
+        if let length = try? await asset.load(.duration).seconds, length.isFinite, length > 0 {
+            seconds = min(seconds, max(0, length - 0.05))
+        }
+        do {
+            let result = try await generator.image(at: CMTime(seconds: seconds, preferredTimescale: 600))
+            if Task.isCancelled { return nil }
+            return detectPose(in: result.image, at: seconds)
+        } catch {
+            return nil
+        }
+    }
+
     /// Runs Vision on one image and returns the largest person's joints.
     private static func detectPose(in image: CGImage, at time: Double) -> PoseSample? {
         let request = VNDetectHumanBodyPoseRequest()
