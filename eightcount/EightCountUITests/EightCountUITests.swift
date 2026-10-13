@@ -42,6 +42,15 @@ final class EightCountUITests: XCTestCase {
         waitFor(demo)
         shot("01-project-list")
 
+        // 1b. New Project sheet (then cancel)
+        app.buttons["New project"].firstMatch.tap()
+        let cancel = app.buttons["Cancel"].firstMatch
+        waitFor(cancel, 5)
+        sleep(1)
+        shot("01b-new-project")
+        cancel.tap()
+        waitFor(demo, 5)
+
         // 2. Practice screen with the video
         demo.tap()
         let play = app.buttons["Play"].firstMatch
