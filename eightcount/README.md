@@ -266,10 +266,26 @@ facial expression or energy.
 
 ## 5. Check on Mac (what I'm not 100 % sure about)
 
-The code was written in a Linux environment without Xcode, so **it has never
-been compiled**. I wrote it carefully against the iOS 17 APIs and had it
-reviewed independently, but expect a few small compile errors on the first
-build. Here is where to look first:
+**Verified on GitHub's Macs** (workflow `.github/workflows/eightcount-ios-build.yml`,
+runs after every change, results under the repo's **Actions** tab):
+
+- **Builds with 0 errors** with **Xcode 27** (27A266a, iOS 27.0 SDK) and with
+  Xcode 26, for a real iPhone (unsigned).
+- **UI test passes in the iOS 27 Simulator.** It taps through: project list
+  → practice screen with video → play → 0.5× + mirror → loop an 8-count →
+  notes → My Takes → compare (portrait and landscape) → AI analysis. Nothing
+  crashed, and landscape shows you on the left and the tutorial on the
+  right. It uses a generated test video with no person in it, so the
+  analysis correctly answers "couldn't find the dancer". Screenshots are in
+  the run's **Artifacts** ("ui-screenshots").
+
+**Not testable there** (no camera, no real person, no Apple Intelligence in
+the simulator), so please check these on your iPhone: recording with the
+front camera, real dance analysis, the Apple-Intelligence tips, and signing
+with your Apple ID.
+
+The lists below were written before the code could be compiled. They're
+still useful if something behaves oddly on the phone.
 
 **A. Most likely to cause build errors (check these first)**
 
@@ -393,6 +409,14 @@ Change any of them later.
   every entry in one file.
 - **Simple generated app icon**: eight beat dots in a circle, the first one
   highlighted, plus a play triangle.
+
+**Testing**
+- **A Debug-only demo seed** (`App/DebugSeed.swift`) creates a "Demo"
+  project when the app is launched with `-seedDemo`. Only the UI test uses
+  it. It's left out of release builds, and a normal launch never triggers it.
+- **A UI-test target** (`EightCountUITests`) and a GitHub Actions workflow
+  build and test the app on Xcode 27 and 26. They're free, because the repo
+  is public.
 
 **Look & layout**
 - **Always dark** (`UIUserInterfaceStyle = Dark`), coral-pink accent, light-blue

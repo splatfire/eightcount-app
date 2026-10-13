@@ -1,3 +1,5 @@
+STATUS: DONE
+
 # EightCount (iOS dance-practice app) — progress
 
 App lives in `eightcount/`. Generate the Xcode project with `xcodegen generate` in that folder
@@ -41,13 +43,18 @@ User asked for (subagents must use model "sonnet" to save tokens):
 - Added CI job "Launch in Simulator (Xcode 27)": boots an iPhone simulator, installs, launches,
   checks the process is alive after 12 s, uploads launch.png.
 
+- Added UI test target `EightCountUITests` + Debug-only `App/DebugSeed.swift` (`-seedDemo`), CI job
+  "UI test in Simulator (Xcode 27)" with ffmpeg test video. Run 38430578163: ALL GREEN
+  (build Xcode 27, build Xcode 26, UI test 12 steps, no crash). Screenshots checked: practice, loop,
+  notes, takes, compare portrait + landscape (YOU left / TUTORIAL right), analysis error for no-person video.
+- First UI-test attempt failed only because the XCTest runner didn't bootstrap on CI -> fixed by
+  booting the simulator first + build-for-testing + one retry.
+
 ## Next step
-- Check the simulator smoke job result + screenshot; fix any runtime crash.
-- On the Mac: `cd eightcount && xcodegen generate && open EightCount.xcodeproj`, build, and fix any
-  first-build errors (see README → "Check on Mac").
-- Then test record → compare → analyze on the iPhone (README → Check on Mac, section D).
-- Then the nice-to-haves in README → "Next steps".
+- User, on the Mac: clone/pull branch `claude/nice-bardeen-84bg5p`, run `eightcount/setup-mac.sh [TEAM_ID] [BUNDLE_ID]`,
+  pick the iPhone, Run. Then test on device: camera recording, real analysis, Apple Intelligence tips.
+- Nice-to-haves: README → Next steps.
 
 ## Open problems
-- The code has never been compiled (written on Linux; no Swift toolchain could be downloaded here).
-  Expect a few small compile errors on the first Xcode build.
+- Not verifiable in CI: front-camera recording, analysis with a real dancer, Apple Intelligence tips,
+  device signing. Needs a test on the iPhone.
