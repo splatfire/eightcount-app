@@ -42,14 +42,16 @@ struct CountGrid: Equatable {
 
     /// The 8-count playing at `time`, or nil before count 1 / without BPM.
     func index(at time: Double) -> Int? {
-        guard isValid, time >= offset else { return nil }
+        let count = numberOfEightCounts
+        // No 8-counts at all (e.g. count 1 is after the end of the video).
+        guard isValid, count > 0, time.isFinite, time >= offset else { return nil }
         let i = Int(floor((time - offset) / eightCountDuration))
-        return i < numberOfEightCounts ? i : max(numberOfEightCounts - 1, 0)
+        return min(i, count - 1)
     }
 
     /// The count (1...8) within its 8-count at `time`, or nil before count 1.
     func beat(at time: Double) -> Int? {
-        guard isValid, time >= offset else { return nil }
+        guard isValid, time.isFinite, time >= offset else { return nil }
         let intoEight = (time - offset).truncatingRemainder(dividingBy: eightCountDuration)
         return min(Int(floor(intoEight / beatDuration)) + 1, 8)
     }
