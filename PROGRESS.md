@@ -1,5 +1,3 @@
-STATUS: DONE
-
 # EightCount (iOS dance-practice app) — progress
 
 App lives in `eightcount/`. Generate the Xcode project with `xcodegen generate` in that folder
@@ -31,7 +29,15 @@ User asked for (subagents must use model "sonnet" to save tokens):
 - [x] Integration in ProjectDetailView (record button, My Takes, compare cover)
 - [x] Review (sonnet agent) + README update (features, permissions, decisions, Check on Mac D)
 
+## Session 3 (in progress): get it building with Xcode 27
+- The cloud session can't reach the user's Mac. Instead: GitHub Actions compile check
+  `.github/workflows/eightcount-ios-build.yml` (runners `xcode-27` [preview] and `macos-26`),
+  unsigned `xcodebuild build -destination generic/platform=iOS`. Fix errors until green.
+- Added `eightcount/setup-mac.sh` (one-command local setup) and `eightcount/.gitignore`.
+- Fixed README: decision bullets had been pasted into the feature list.
+
 ## Next step
+- Watch the "EightCount iOS build" run; fix every compile error; re-push until both jobs are green.
 - On the Mac: `cd eightcount && xcodegen generate && open EightCount.xcodeproj`, build, and fix any
   first-build errors (see README → "Check on Mac").
 - Then test record → compare → analyze on the iPhone (README → Check on Mac, section D).

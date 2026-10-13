@@ -61,7 +61,30 @@ project and a small tool called **XcodeGen** turns it into one.
    ```
 4. Open Xcode once and let it install its extra components if it asks.
 
-### 1.2 Generate and open the project
+### 1.2 Get the code onto your Mac
+
+```sh
+git clone -b claude/nice-bardeen-84bg5p https://github.com/splatfire/splatfire.git
+cd splatfire/eightcount
+```
+
+(Already cloned? Run `git pull` inside the `splatfire` folder instead.)
+
+**Shortcut:** `./setup-mac.sh` does steps 1.1 (XcodeGen part) and 1.3 for
+you. It checks Xcode, installs XcodeGen, generates the project, runs a quick
+compile check, and opens Xcode. Optionally, it also saves your Team ID and
+bundle ID:
+
+```sh
+./setup-mac.sh                                   # just generate + open
+./setup-mac.sh ABCDE12345 com.yourname.eightcount  # + your Team ID and bundle ID
+```
+
+The code is also compiled automatically on GitHub's Macs, with Xcode 27 and
+Xcode 26, after every change ("EightCount iOS build" under the repo's
+**Actions** tab). A green check there means it compiles.
+
+### 1.3 Generate and open the project (manual way)
 
 ```sh
 cd path/to/splatfire/eightcount      # the folder that contains project.yml
@@ -76,7 +99,7 @@ Run `xcodegen generate` again whenever files are added or removed or
 `project.yml` changes. It rebuilds `EightCount.xcodeproj` from scratch.
 **Close the project in Xcode before regenerating.**
 
-### 1.3 Sign in and pick your team (signing)
+### 1.4 Sign in and pick your team (signing)
 
 1. Xcode → **Settings…** (⌘,) → **Accounts** → **+** → **Apple ID** → sign in.
    A free Apple ID shows up as "*Your Name* (Personal Team)".
@@ -96,7 +119,7 @@ step 3, go to the **Build Settings** tab, search for "Development Team", and
 copy the 10-character ID. Paste it into `project.yml` at
 `DEVELOPMENT_TEAM: ""` (between the quotes).
 
-### 1.4 Prepare the iPhone (one time)
+### 1.5 Prepare the iPhone (one time)
 
 1. Connect the iPhone with the cable, unlock it, and tap **Trust** when it asks
    to trust this computer.
@@ -105,7 +128,7 @@ copy the 10-character ID. Paste it into `project.yml` at
    If the switch isn't there, keep the iPhone connected and open
    **Window → Devices and Simulators** in Xcode once. The option then appears.
 
-### 1.5 Run
+### 1.6 Run
 
 1. In the Xcode toolbar at the top, click the device selector (next to
    "EightCount") and choose your iPhone.
