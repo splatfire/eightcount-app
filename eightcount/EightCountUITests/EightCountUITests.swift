@@ -80,11 +80,18 @@ final class EightCountUITests: XCTestCase {
         waitFor(done)
         shot("06-notes")
         done.tap()
+        // Let the sheet finish closing before using the toolbar menu.
+        XCTAssertTrue(done.waitForNonExistence(timeout: 10), "Notes sheet didn't close")
+        sleep(1)
 
         // 7. My Takes → Compare
-        app.buttons["More"].firstMatch.tap()
         let takesItem = app.buttons["My Takes (1)"].firstMatch
-        waitFor(takesItem, 5)
+        for _ in 0..<3 where !(takesItem.exists && takesItem.isHittable) {
+            app.buttons["More"].firstMatch.tap()
+            _ = takesItem.waitForExistence(timeout: 3)
+            sleep(1)
+        }
+        XCTAssertTrue(takesItem.isHittable, "My Takes menu item not tappable")
         takesItem.tap()
         let takeRow = app.cells.firstMatch
         waitFor(takeRow)
