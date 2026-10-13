@@ -89,7 +89,8 @@ final class PlayerController {
         player = AVPlayer()
         // At the end of the video just stop (we handle looping ourselves).
         player.actionAtItemEnd = .pause
-        installObserversIfNeeded()
+        // Observers are added in `load(url:)`, not here: SwiftUI may create
+        // (and throw away) extra controllers, so `init` should stay cheap.
     }
 
     /// Opens a video file. Replaces whatever was loaded before.

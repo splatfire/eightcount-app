@@ -144,9 +144,15 @@ struct ProjectDetailView: View {
                         Text("Add the tutorial or dance practice video for this project.")
                     }
                 }
-                VideoImportButtons { stored, original in
-                    attachVideo(stored: stored, original: original)
+                // The import buttons live in a sheet: SwiftUI can get confused
+                // by two `.fileImporter`s in one screen hierarchy (the project
+                // list already has one for importing notes).
+                Button {
+                    showReplaceSheet = true
+                } label: {
+                    Label("Add Video", systemImage: "plus")
                 }
+                .buttonStyle(.big(isOn: true))
                 .padding(.horizontal, 24)
             }
             .padding(.top, 40)
@@ -214,7 +220,9 @@ struct ProjectDetailView: View {
     private var replaceVideoSheet: some View {
         NavigationStack {
             VStack(spacing: 20) {
-                Text("Pick the new video. Notes stay attached to their 8-count numbers.")
+                Text(hasVideo
+                     ? "Pick the new video. Notes stay attached to their 8-count numbers."
+                     : "Pick the video for this project.")
                     .foregroundStyle(Theme.secondaryText)
                     .multilineTextAlignment(.center)
                 VideoImportButtons { stored, original in
@@ -224,7 +232,7 @@ struct ProjectDetailView: View {
                 Spacer()
             }
             .padding(24)
-            .navigationTitle("Replace Video")
+            .navigationTitle(hasVideo ? "Replace Video" : "Add Video")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

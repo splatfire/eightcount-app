@@ -188,7 +188,61 @@ been compiled**. I wrote it carefully against the iOS 17 APIs and had it
 reviewed independently, but expect a few small compile errors on the first
 build. Here is where to look first:
 
-<!-- CHECK_ON_MAC -->
+**A. Most likely to cause build errors (check these first)**
+
+1. **Main-actor isolation** (if Xcode says something like "call to main
+   actor-isolated … in a synchronous nonisolated context"). Most view structs
+   are marked `@MainActor`. If one that isn't (`ExportProjectButton`,
+   `VideoImportButtons`, small private views) complains, put `@MainActor` on
+   the line above its `struct`. This mainly matters on Xcode 15; on Xcode 16
+   and newer, every SwiftUI view is main-actor anyway.
+2. **"Initializer is inaccessible due to 'private' protection level"** on
+   `ProjectDetailView(project:)`, `NewProjectSheet { … }` or
+   `VideoImportButtons { … }`. These rely on Swift's automatic initializer.
+   If this appears, add an explicit `init` like the other views have.
+3. **`Divider().overlay(Theme.surfaceRaised)`** in `ProjectDetailView`. If Xcode
+   says "ambiguous use", change it to `.background(Theme.surfaceRaised)`.
+4. **`Bindable(wrappedValue:)`** in `TempoSetupSheet`'s `init`, and the
+   `ChipFlowLayout` (`Layout` protocol) in `CountRowView`.
+5. **Concurrency *warnings*** in `PlayerController` (AVFoundation callbacks)
+   and `SnapshotImageCache` (`static let NSCache`). These are yellow warnings,
+   not errors. You can ignore them for now.
+
+**B. Worth one test on the phone**
+
+1. **Slow speeds:** at 0.25× and 0.5×, check that the sound keeps its pitch.
+   The app uses Apple's `.spectral` setting. If you hear no sound at 0.25×,
+   tell me.
+2. **Mirror:** check that the video really flips (it uses SwiftUI's
+   `scaleEffect(x: -1)` on the video view).
+3. **Importing from Photos:** a long video or one stored in iCloud takes a
+   moment to copy, and a "Copying video…" spinner shows. In the New Project
+   form, check that tapping "From Photos" doesn't also open "From Files". Both
+   buttons sit in one form row.
+4. **"From Files" importing** in the New Project sheet and in the Add / Replace
+   Video sheet. Also check the ⤓ import of a notes file on the project list.
+   SwiftUI is picky about several file pickers, so I put each in its own sheet.
+5. **The A-B loop:** it can overshoot B by up to about 1/60 s before jumping
+   back. That's fine for dancing, but tell me if it feels late.
+6. **Holding the ◀︎ / ▶︎ frame buttons should repeat**
+   (`.buttonRepeatBehavior`).
+7. **Export** (↑ button in the practice screen): the share sheet opens. Try
+   "Save to Files" and AirDrop. Then import the file again from the project
+   list.
+8. **Auto-scroll:** while the video plays, the 8-count list scrolls to the
+   current row.
+9. **The tempo sheet** (tap the "♩ BPM" bar above the list) opens half-height
+   with a Play/Pause bar, so you can tap along while the music plays.
+10. **Silent switch:** music should still play with the switch on silent.
+
+**C. Things I knowingly left simple**
+
+- `@State private var controller = PlayerController()`: SwiftUI may create
+  a few spare players that are thrown away right away. That's harmless,
+  because creating one is cheap.
+- Some SF Symbol names (`shoeprints.fill`, `figure.arms.open`,
+  `location.north.line.fill`, …). A wrong name just shows an empty icon. It
+  never breaks the build.
 
 **How to fix a build error:** click the red error in Xcode's Issue navigator
 (⌘5). It jumps to the line. Many errors have a **Fix** button. If you're stuck,
@@ -230,6 +284,9 @@ Change any of them later.
 - **Videos are copied** into the app's private folder (Application
   Support/Videos), under a random file name. They're included in your
   normal iPhone backup.
+- **Videos from Photos are imported in their original format**
+  (`preferredItemEncoding: .current`). The other option re-encodes the video,
+  which can take minutes on long clips.
 - **A project can exist without a video.** You can add one later, or replace
   it (with a confirmation). Notes stay attached to their 8-count numbers.
 - **Picking a video in the New Project sheet and then pressing Cancel deletes

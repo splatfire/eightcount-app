@@ -16,7 +16,9 @@ struct VideoImportButtons: View {
     var body: some View {
         VStack(spacing: 12) {
             // PhotosPicker runs outside the app, so it needs no Photos permission.
-            PhotosPicker(selection: $photoItem, matching: .videos) {
+            // `.current` = give us the original file; don't convert it first
+            // (converting a long video can take minutes).
+            PhotosPicker(selection: $photoItem, matching: .videos, preferredItemEncoding: .current) {
                 Label("From Photos", systemImage: "photo.on.rectangle")
             }
             .buttonStyle(.big)
