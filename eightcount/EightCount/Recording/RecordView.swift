@@ -1,0 +1,1073 @@
+import SwiftUI
+import SwiftData
+import AVFoundation
+import CoreMedia
+import UIKit
+
+/// The recording screen: the tutorial plays (with its music) while the front
+/// camera films you dancing. Afterwards you can jump to the compare screen.
+///
+/// Present it with `.fullScreenCover`. It has its own Close (X) button.
+@MainActor
+struct RecordView: View {
+    let project: Project
+    /// Tutorial time (s) to start from.
+    let startTime: Double
+    /// Tutorial time (s) at which recording stops by itself (nil = to the end / Stop).
+    let endTime: Double?
+    /// Tutorial speed while recording (0.25 ... 1).
+    let rate: Double
+    /// Show the tutorial flipped, like a mirror.
+    let tutorialMirrored: Bool
+    /// Called with the saved take ("Compare"), or nil when closed without comparing.
+    let onFinished: (Take?) -> Void
+
+    @Environment(\.modelContext) private var modelContext
+
+    /// Does all the work (camera, tutorial player, record flow).
+    @State private var model = RecordSessionModel()
+    @State private var layout: RecordLayout = .sideBySide
+    @State private var ghostOpacity = 0.45
+    @State private var showDiscardDialog = false
+
+    init(project: Project, startTime: Double, endTime: Double?, rate: Double,
+         tutorialMirrored: Bool, onFinished: @escaping (Take?) -> Void) {
+        self.project = project
+        self.startTime = max(startTime, 0)
+        self.endTime = endTime
+        self.rate = min(max(rate, 0.25), 1)
+        self.tutorialMirrored = tutorialMirrored
+        self.onFinished = onFinished
+    }
+
+    // MARK: - Body
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            if model.recorder.authorization == .denied || model.recorder.authorization == .restricted {
+                permissionDeniedView
+            } else {
+                recordingScreen
+            }
+        }
+        .statusBarHidden()
+        .onAppear {
+            OrientationLock.allowLandscape()
+            UIApplication.shared.isIdleTimerDisabled = true
+        }
+        .task {
+            model.setUp(project: project, startTime: startTime, endTime: endTime, rate: rate,
+                        context: modelContext, onFinished: onFinished)
+            await model.begin()
+        }
+        .onDisappear {
+            model.end()
+            OrientationLock.portraitOnly()
+            UIApplication.shared.isIdleTimerDisabled = false
+        }
+        .onChange(of: model.recorder.errorMessage) { _, newValue in
+            if let newValue { model.errorMessage = newValue }
+        }
+        .alert("Something went wrong", isPresented: alertBinding) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(model.errorMessage ?? "")
+        }
+        .confirmationDialog("Stop and discard this recording?",
+                            isPresented: $showDiscardDialog,
+                            titleVisibility: .visible) {
+            Button("Discard recording", role: .destructive) { model.discardAndClose() }
+            Button("Keep recording", role: .cancel) {}
+        }
+        .sensoryFeedback(trigger: model.phase) { _, newPhase in
+            switch newPhase {
+            case .countdown: return .start
+            case .finishing: return .stop
+            case .saved: return .success
+            default: return nil
+            }
+        }
+    }
+
+    private var alertBinding: Binding<Bool> {
+        Binding(
+            get: { model.errorMessage != nil },
+            set: { if !$0 { model.errorMessage = nil } }
+        )
+    }
+
+    // MARK: - Main screen
+
+    private var recordingScreen: some View {
+        ZStack {
+            mediaLayer
+            controlsLayer
+            countdownOverlay
+            cameraStatus
+            if model.phase == .saved {
+                resultPanel
+                    .transition(.scale(scale: 0.9).combined(with: .opacity))
+            }
+        }
+        .animation(.snappy, value: model.phase)
+    }
+
+    // MARK: Camera + tutorial pictures
+
+    /// Where the two pictures go on screen.
+    private struct TileRects {
+        var camera: CGRect
+        var tutorial: CGRect
+    }
+
+    private static func tileRects(size: CGSize, landscape: Bool, ghost: Bool) -> TileRects {
+        let full = CGRect(origin: .zero, size: size)
+        if ghost {
+            // Ghost: both pictures fill the whole screen, tutorial on top.
+            return TileRects(camera: full, tutorial: full)
+        }
+        let gap: CGFloat = 2
+        if landscape {
+            // Camera left, tutorial right.
+            let width = (size.width - gap) / 2
+            return TileRects(
+                camera: CGRect(x: 0, y: 0, width: width, height: size.height),
+                tutorial: CGRect(x: width + gap, y: 0, width: width, height: size.height)
+            )
+        } else {
+            // Camera top, tutorial bottom.
+            let height = (size.height - gap) / 2
+            return TileRects(
+                camera: CGRect(x: 0, y: 0, width: size.width, height: height),
+                tutorial: CGRect(x: 0, y: height + gap, width: size.width, height: height)
+            )
+        }
+    }
+
+    /// The two pictures. They are always the same two views (only their
+    /// frames change), so switching layout never restarts the camera.
+    private var mediaLayer: some View {
+        GeometryReader { geo in
+            let size = geo.size
+            let landscape = size.width > size.height
+            let ghost = layout == .ghost
+            let rects = Self.tileRects(size: size, landscape: landscape, ghost: ghost)
+
+            ZStack {
+                Color.black
+
+                CameraPreviewView(recorder: model.recorder)
+                    .frame(width: rects.camera.width, height: rects.camera.height)
+                    .clipped()
+                    .overlay(alignment: landscape ? .topTrailing : .bottomLeading) {
+                        if !ghost { badge("YOU") }
+                    }
+                    .position(x: rects.camera.midX, y: rects.camera.midY)
+
+                RecordTutorialLayer(player: model.tutorial.player)
+                    .frame(width: rects.tutorial.width, height: rects.tutorial.height)
+                    // Only the tutorial picture is flipped, not the badge.
+                    .scaleEffect(x: tutorialMirrored ? -1 : 1, y: 1)
+                    .opacity(ghost ? ghostOpacity : 1)
+                    .overlay {
+                        if let error = model.tutorial.loadError {
+                            Label(error, systemImage: "exclamationmark.triangle")
+                                .font(.footnote)
+                                .foregroundStyle(Theme.secondaryText)
+                                .multilineTextAlignment(.center)
+                                .padding()
+                        }
+                    }
+                    .overlay(alignment: .topLeading) {
+                        if !ghost { badge("TUTORIAL") }
+                    }
+                    .position(x: rects.tutorial.midX, y: rects.tutorial.midY)
+                    .allowsHitTesting(false)
+            }
+            .frame(width: size.width, height: size.height)
+            .animation(.snappy(duration: 0.3), value: layout)
+        }
+        .ignoresSafeArea()
+    }
+
+    /// Small label on a picture ("YOU" / "TUTORIAL").
+    private func badge(_ title: String) -> some View {
+        Text(title)
+            .font(.system(.caption2, design: .rounded).weight(.heavy))
+            .tracking(1)
+            .foregroundStyle(Color.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(Color.black.opacity(0.55)))
+            .padding(8)
+            .accessibilityHidden(true)
+    }
+
+    /// Shown over the camera while it starts, or when it cannot start.
+    @ViewBuilder
+    private var cameraStatus: some View {
+        if model.phase == .idle {
+            if let message = model.recorder.errorMessage {
+                Text(message)
+                    .font(.callout)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(Color.white)
+                    .padding(16)
+                    .glassSurface(RoundedRectangle(cornerRadius: 20, style: .continuous),
+                                  fallback: Theme.surface.opacity(0.9))
+                    .padding(32)
+            } else if !model.recorder.isRunning {
+                ProgressView()
+                    .tint(.white)
+                    .controlSize(.large)
+            }
+        }
+    }
+
+    // MARK: Controls
+
+    private var controlsLayer: some View {
+        VStack(spacing: 0) {
+            topChips
+            Spacer(minLength: 0)
+            if model.phase != .saved {
+                controlBar
+                    .frame(maxWidth: 560)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    /// "● REC 0:07" while recording, plus what is going to be recorded.
+    private var topChips: some View {
+        GlassGroup(spacing: 8) {
+            VStack(spacing: 6) {
+                if model.isRecordingActive {
+                    recChip
+                }
+                Text(infoText)
+                    .font(.system(.caption, design: .rounded).weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(Color.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .glassSurface(Capsule(), fallback: Theme.surface.opacity(0.85))
+            }
+        }
+        .opacity(model.phase == .saved ? 0 : 1)
+    }
+
+    private var recChip: some View {
+        TimelineView(.periodic(from: .now, by: 0.25)) { _ in
+            let elapsed = max(0, CMClockGetTime(CMClockGetHostTimeClock()).seconds - model.recordingStartSeconds)
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: 10, height: 10)
+                Text("REC \(Self.clock(elapsed))")
+                    .font(.system(.subheadline, design: .rounded).weight(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(Color.white)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .glassSurface(Capsule(), tint: Color.red.opacity(0.55), fallback: Color.red.opacity(0.75))
+        }
+        .accessibilityLabel("Recording")
+    }
+
+    private var infoText: String {
+        var text = "Starts at \(formatTime(startTime)) · \(Self.rateText(rate))"
+        if let endTime, endTime > startTime {
+            text += " · until \(formatTime(endTime))"
+        }
+        return text
+    }
+
+    private var controlBar: some View {
+        GlassGroup(spacing: 12) {
+            VStack(spacing: 10) {
+                if layout == .ghost {
+                    ghostOpacityRow
+                }
+                HStack(spacing: 10) {
+                    Button {
+                        closeTapped()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.title3.weight(.bold))
+                    }
+                    .buttonStyle(.big)
+                    .frame(maxWidth: 90)
+                    .accessibilityLabel("Close")
+
+                    Button {
+                        layout = (layout == .ghost) ? .sideBySide : .ghost
+                    } label: {
+                        Label(layout == .ghost ? "Ghost" : "Side by side",
+                              systemImage: layout == .ghost ? "square.on.square" : "rectangle.split.2x1")
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                    .buttonStyle(.big(isOn: layout == .ghost))
+                    .disabled(model.isLayoutLocked)
+                    .opacity(model.isLayoutLocked ? 0.4 : 1)
+                    .accessibilityLabel("Layout")
+                    .accessibilityValue(layout == .ghost ? "Ghost" : "Side by side")
+
+                    recordButton
+                }
+            }
+            .padding(12)
+            .glassSurface(RoundedRectangle(cornerRadius: 30, style: .continuous),
+                          fallback: Theme.surface.opacity(0.94))
+        }
+    }
+
+    /// Slider for how see-through the tutorial "ghost" is.
+    private var ghostOpacityRow: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "circle.lefthalf.filled")
+                .foregroundStyle(Theme.secondaryText)
+                .accessibilityHidden(true)
+            Slider(value: $ghostOpacity, in: 0.2...0.8)
+                .tint(Theme.accent)
+                .accessibilityLabel("Tutorial opacity")
+            Text("\(Int((ghostOpacity * 100).rounded()))%")
+                .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(Color.white)
+                .frame(width: 52, alignment: .trailing)
+        }
+        .frame(minHeight: 44)
+    }
+
+    /// Red circle = record, red square = stop.
+    private var recordButton: some View {
+        let isStop = model.canStop
+        let enabled = model.canStart || model.canStop
+        return Button {
+            model.recordButtonTapped()
+        } label: {
+            ZStack {
+                Circle()
+                    .strokeBorder(Color.white, lineWidth: 4)
+                    .frame(width: 72, height: 72)
+                if isStop {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.red)
+                        .frame(width: 28, height: 28)
+                } else {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 56, height: 56)
+                }
+            }
+            .frame(width: 80, height: 80)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.4)
+        .animation(.snappy, value: isStop)
+        .accessibilityLabel(isStop ? "Stop recording" : "Start recording")
+    }
+
+    // MARK: Countdown
+
+    @ViewBuilder
+    private var countdownOverlay: some View {
+        if let value = model.countdownValue {
+            ZStack {
+                Color.black.opacity(0.35).ignoresSafeArea()
+                VStack(spacing: 4) {
+                    Text("Get ready")
+                        .font(.system(.title3, design: .rounded).weight(.semibold))
+                        .foregroundStyle(Color.white.opacity(0.9))
+                    Text("\(value)")
+                        .font(.system(size: 160, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.white)
+                        .id(value)
+                        .transition(.scale(scale: 1.6).combined(with: .opacity))
+                }
+                .shadow(color: .black.opacity(0.5), radius: 12)
+            }
+            .allowsHitTesting(false)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Starting in \(value)")
+        } else if model.showGo {
+            Text("GO!")
+                .font(.system(size: 120, weight: .heavy, design: .rounded))
+                .foregroundStyle(Theme.accent)
+                .shadow(color: .black.opacity(0.5), radius: 12)
+                .transition(.scale(scale: 1.4).combined(with: .opacity))
+                .allowsHitTesting(false)
+        }
+    }
+
+    // MARK: Result panel
+
+    private var resultPanel: some View {
+        ZStack {
+            Color.black.opacity(0.45).ignoresSafeArea()
+
+            VStack(spacing: 12) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 40))
+                    .foregroundStyle(Color.green)
+                    .accessibilityHidden(true)
+                Text("Saved!")
+                    .font(.system(.title, design: .rounded).weight(.bold))
+                    .foregroundStyle(Color.white)
+                Text("Your recording is saved in this project.")
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.secondaryText)
+                    .multilineTextAlignment(.center)
+
+                GlassGroup(spacing: 10) {
+                    VStack(spacing: 10) {
+                        Button("Compare") {
+                            model.finish(with: model.savedTake)
+                        }
+                        .buttonStyle(.big(isOn: true))
+
+                        HStack(spacing: 10) {
+                            Button("Record again") {
+                                model.recordAgain()
+                            }
+                            .buttonStyle(.big)
+
+                            Button("Done") {
+                                model.finish(with: nil)
+                            }
+                            .buttonStyle(.big)
+                        }
+                    }
+                }
+            }
+            .padding(20)
+            .frame(maxWidth: 380)
+            .glassSurface(RoundedRectangle(cornerRadius: 28, style: .continuous),
+                          fallback: Theme.surface)
+            .padding(16)
+        }
+    }
+
+    // MARK: Permission denied
+
+    private var permissionDeniedView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "camera.fill")
+                .font(.system(size: 44))
+                .foregroundStyle(Theme.secondaryText)
+                .accessibilityHidden(true)
+            Text("Camera access is off")
+                .font(.system(.title2, design: .rounded).weight(.bold))
+                .foregroundStyle(Color.white)
+            Text("EightCount needs the front camera to film you dancing, so you can compare yourself with the tutorial. Nothing is uploaded and no microphone is used. You can switch the camera on in Settings.")
+                .font(.subheadline)
+                .foregroundStyle(Theme.secondaryText)
+                .multilineTextAlignment(.center)
+
+            Button {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            } label: {
+                Label("Open Settings", systemImage: "gearshape")
+            }
+            .buttonStyle(.big(isOn: true))
+
+            Button("Close") {
+                model.finish(with: nil)
+            }
+            .buttonStyle(.big)
+        }
+        .padding(24)
+        .frame(maxWidth: 420)
+    }
+
+    // MARK: - Actions & formatting
+
+    private func closeTapped() {
+        switch model.phase {
+        case .starting, .countdown, .recording, .finishing:
+            // Closing would lose the recording: ask first.
+            showDiscardDialog = true
+        case .idle, .saved:
+            model.finish(with: nil)
+        }
+    }
+
+    /// "0:07"
+    private static func clock(_ seconds: Double) -> String {
+        let total = Int(max(seconds, 0))
+        return String(format: "%d:%02d", total / 60, total % 60)
+    }
+
+    /// "0.5×", "1×"
+    private static func rateText(_ rate: Double) -> String {
+        String(format: "%g×", rate)
+    }
+}
+
+/// How the camera and the tutorial are arranged.
+private enum RecordLayout {
+    case sideBySide
+    case ghost
+}
+
+// MARK: - The record flow
+
+/// Runs the whole recording: camera, tutorial player, countdown, saving.
+///
+/// Kept out of the view so closures and timers have a stable object to talk
+/// to (a SwiftUI view is a throw-away value).
+@MainActor
+@Observable
+private final class RecordSessionModel {
+    enum Phase {
+        /// Ready (or waiting for camera / tutorial).
+        case idle
+        /// Record was tapped; waiting until the camera really writes frames.
+        case starting
+        /// Camera is recording, the tutorial starts in a few seconds.
+        case countdown
+        /// Camera is recording and the tutorial plays.
+        case recording
+        /// Stopped; waiting for the movie file to be finished.
+        case finishing
+        /// Take saved; the result panel is shown.
+        case saved
+    }
+
+    /// The camera starts recording this many seconds BEFORE the tutorial.
+    /// (This is saved as the take's `takeOffset`.)
+    nonisolated static let countdownSeconds: Double = 3.0
+
+    let recorder = CameraRecorder()
+    let tutorial = RecordTutorialPlayer()
+
+    private(set) var phase: Phase = .idle
+    /// 3, 2, 1 while counting down, otherwise nil.
+    private(set) var countdownValue: Int? = nil
+    private(set) var showGo = false
+    private(set) var savedTake: Take? = nil
+    /// Host-clock time (s) when the camera started recording (for "REC 0:07").
+    private(set) var recordingStartSeconds: Double = 0
+    var errorMessage: String? = nil
+
+    @ObservationIgnored private var project: Project?
+    @ObservationIgnored private var context: ModelContext?
+    @ObservationIgnored private var onFinished: ((Take?) -> Void)?
+    @ObservationIgnored private var startTime: Double = 0
+    @ObservationIgnored private var rate: Double = 1
+    @ObservationIgnored private var didSetUp = false
+    @ObservationIgnored private var didFinish = false
+    @ObservationIgnored private var isEnded = false
+    @ObservationIgnored private var countdownTask: Task<Void, Never>? = nil
+    /// Tutorial time when recording stopped.
+    @ObservationIgnored private var tutorialEndSeconds: Double = 0
+    /// Delete the file instead of saving it (stopped too early / closed).
+    @ObservationIgnored private var discardOnFinish = false
+
+    // MARK: Derived state for the buttons
+
+    var isRecordingActive: Bool {
+        phase == .starting || phase == .countdown || phase == .recording
+    }
+    var canStart: Bool {
+        phase == .idle && recorder.isRunning && tutorial.isReady
+    }
+    var canStop: Bool {
+        phase == .countdown || phase == .recording
+    }
+    var isLayoutLocked: Bool {
+        phase == .starting || phase == .countdown || phase == .finishing
+    }
+
+    // MARK: Lifecycle
+
+    func setUp(project: Project, startTime: Double, endTime: Double?, rate: Double,
+               context: ModelContext, onFinished: @escaping (Take?) -> Void) {
+        guard !didSetUp else { return }
+        didSetUp = true
+        self.project = project
+        self.context = context
+        self.onFinished = onFinished
+        self.startTime = startTime
+        self.rate = rate
+        tutorial.onReachedEnd = { [weak self] in
+            self?.tutorialReachedEnd()
+        }
+        tutorial.configure(startTime: startTime, endTime: endTime, rate: Float(rate))
+    }
+
+    /// Prepares sound, tutorial and camera.
+    func begin() async {
+        // Play the tutorial's music even when the silent switch is on.
+        // (The camera records no sound, so nothing else needs the audio session.)
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
+        try? AVAudioSession.sharedInstance().setActive(true)
+
+        tutorial.prepare(url: project?.videoURL)
+        await recorder.start()
+    }
+
+    /// The screen went away: stop everything. A recording that is still
+    /// running is thrown away.
+    func end() {
+        isEnded = true
+        if isRecordingActive || phase == .finishing {
+            discardOnFinish = true
+            if isRecordingActive { beginFinishing() }
+        }
+        countdownTask?.cancel()
+        countdownTask = nil
+        tutorial.tearDown()
+        recorder.stop()
+    }
+
+    /// Hands the result to whoever presented this screen (once).
+    func finish(with take: Take?) {
+        guard !didFinish else { return }
+        didFinish = true
+        onFinished?(take)
+    }
+
+    // MARK: Record / stop
+
+    func recordButtonTapped() {
+        switch phase {
+        case .idle: startRecordingFlow()
+        case .countdown, .recording: stopRecordingTapped()
+        default: break
+        }
+    }
+
+    private func startRecordingFlow() {
+        guard canStart else { return }
+        let fileName = TakeStore.newTakeFileName()
+        let url = VideoStorage.url(forFileName: fileName)
+
+        discardOnFinish = false
+        tutorialEndSeconds = startTime
+        savedTake = nil
+        phase = .starting
+
+        recorder.startRecording(
+            to: url,
+            onStarted: { [weak self] hostTime in
+                self?.recordingStarted(hostTime: hostTime)
+            },
+            onFinished: { [self] result in
+                self.recordingFinished(result, fileName: fileName)
+            }
+        )
+    }
+
+    /// The camera is now really recording. Schedule the tutorial to start
+    /// exactly `countdownSeconds` later, using the iPhone's host clock, and
+    /// show the 3-2-1.
+    ///
+    /// Sync note: the recording starts ~3 s before the tutorial, so the take
+    /// is saved with `takeOffset = 3`. The real delay is never exactly 3 s,
+    /// so the compare screen lets the user fine-tune the sync (`syncNudge`).
+    private func recordingStarted(hostTime: CMTime) {
+        guard phase == .starting else { return }
+        let delay = CMTime(seconds: Self.countdownSeconds, preferredTimescale: 60_000)
+        let tutorialHostTime = CMTimeAdd(hostTime, delay)
+
+        recordingStartSeconds = hostTime.seconds
+        tutorial.startPlayback(atHostTime: tutorialHostTime)
+        phase = .countdown
+        runCountdown(until: tutorialHostTime.seconds)
+    }
+
+    /// Shows 3 · 2 · 1 · GO, driven by the same clock the tutorial uses.
+    private func runCountdown(until targetSeconds: Double) {
+        countdownTask?.cancel()
+        countdownTask = Task { [weak self] in
+            var lastShown = 0
+            while true {
+                guard let self, !Task.isCancelled else { return }
+                let remaining = targetSeconds - CMClockGetTime(CMClockGetHostTimeClock()).seconds
+                if remaining <= 0 { break }
+                let number = Int(remaining.rounded(.up))
+                if number != lastShown {
+                    lastShown = number
+                    withAnimation(.spring(duration: 0.4)) {
+                        self.countdownValue = number
+                    }
+                }
+                try? await Task.sleep(for: .milliseconds(40))
+            }
+            guard let self, !Task.isCancelled else { return }
+            withAnimation(.spring(duration: 0.3)) {
+                self.countdownValue = nil
+                self.showGo = true
+            }
+            if self.phase == .countdown {
+                self.phase = .recording
+            }
+            try? await Task.sleep(for: .milliseconds(700))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.25)) {
+                self.showGo = false
+            }
+        }
+    }
+
+    private func stopRecordingTapped() {
+        guard canStop else { return }
+        beginFinishing()
+        recorder.stopRecording()
+    }
+
+    /// The tutorial reached `endTime` (or its end): stop by itself.
+    private func tutorialReachedEnd() {
+        guard phase == .recording else { return }
+        stopRecordingTapped()
+    }
+
+    /// Common part of every way a recording ends: stop the 3-2-1, pause the
+    /// tutorial and remember where it stopped.
+    private func beginFinishing() {
+        countdownTask?.cancel()
+        countdownTask = nil
+        countdownValue = nil
+        showGo = false
+        // Stopped before the tutorial even started: nothing worth keeping.
+        if phase != .recording {
+            discardOnFinish = true
+        }
+        tutorial.hold()
+        tutorialEndSeconds = tutorial.currentSeconds()
+        phase = .finishing
+    }
+
+    // MARK: Finished
+
+    private func recordingFinished(_ result: Result<URL, Error>, fileName: String) {
+        // The recording ended on its own (e.g. a phone call or the app went
+        // to the background): wrap up as if Stop was tapped.
+        if isRecordingActive {
+            beginFinishing()
+        }
+
+        switch result {
+        case .success:
+            guard !discardOnFinish, let project, let context else {
+                VideoStorage.deleteVideo(named: fileName)
+                backToIdle()
+                return
+            }
+            let take = TakeStore.addTake(
+                fileName: fileName,
+                tutorialStart: startTime,
+                tutorialEnd: max(tutorialEndSeconds, startTime),
+                takeOffset: Self.countdownSeconds,
+                recordRate: rate,
+                to: project,
+                context: context
+            )
+            savedTake = take
+            phase = .saved
+
+        case .failure(let error):
+            VideoStorage.deleteVideo(named: fileName)
+            if !discardOnFinish {
+                errorMessage = "The recording could not be saved. \(error.localizedDescription)"
+            }
+            backToIdle()
+        }
+    }
+
+    private func backToIdle() {
+        phase = .idle
+        guard !isEnded else { return }
+        tutorial.moveToStart()
+    }
+
+    /// "Record again": the saved take stays; go back to the start.
+    func recordAgain() {
+        savedTake = nil
+        phase = .idle
+        tutorial.moveToStart()
+    }
+
+    /// Close was confirmed in the "discard?" dialog.
+    func discardAndClose() {
+        switch phase {
+        case .starting, .countdown, .recording:
+            discardOnFinish = true
+            beginFinishing()
+            recorder.stopRecording()
+        case .finishing:
+            discardOnFinish = true
+        case .saved:
+            // The take was just saved: remove it again.
+            if let take = savedTake, let context {
+                TakeStore.delete(take, context: context)
+                savedTake = nil
+            }
+        case .idle:
+            break
+        }
+        finish(with: nil)
+    }
+}
+
+// MARK: - The tutorial player
+
+/// Plays the tutorial video during recording. Its own `AVPlayer`, separate
+/// from the normal playback screen.
+///
+/// To start the tutorial at an exact moment relative to the camera we use
+/// `setRate(_:time:atHostTime:)`. It only works when
+/// `automaticallyWaitsToMinimizeStalling` is off (otherwise it crashes).
+@MainActor
+@Observable
+private final class RecordTutorialPlayer {
+    let player = AVPlayer()
+
+    /// True when the first frame is shown and the player can start.
+    private(set) var isReady = false
+    private(set) var loadError: String? = nil
+
+    /// Called when playback reaches the end time (or the end of the video).
+    @ObservationIgnored var onReachedEnd: (@MainActor () -> Void)?
+
+    @ObservationIgnored private var startSeconds: Double = 0
+    @ObservationIgnored private var endSeconds: Double? = nil
+    @ObservationIgnored private var rate: Float = 1
+    @ObservationIgnored private var statusObservation: NSKeyValueObservation? = nil
+    @ObservationIgnored private var timeObserver: Any? = nil
+    @ObservationIgnored private var endObserver: NSObjectProtocol? = nil
+    /// True while the tutorial must NOT be playing.
+    @ObservationIgnored private var isHeld = true
+    /// True once playback was scheduled: only then does the end time count.
+    @ObservationIgnored private var watchingEnd = false
+    /// Bumped on every seek so old seek callbacks are ignored.
+    @ObservationIgnored private var seekGeneration = 0
+
+    private static let timeScale: CMTimeScale = 60_000
+
+    init() {
+        // REQUIRED before using setRate(_:time:atHostTime:).
+        player.automaticallyWaitsToMinimizeStalling = false
+        // At the end of the video just stop.
+        player.actionAtItemEnd = .pause
+    }
+
+    func configure(startTime: Double, endTime: Double?, rate: Float) {
+        startSeconds = max(startTime, 0)
+        if let endTime, endTime > startSeconds {
+            endSeconds = endTime
+        } else {
+            endSeconds = nil
+        }
+        self.rate = rate
+    }
+
+    /// Loads the video and shows its first frame at the start time.
+    func prepare(url: URL?) {
+        guard let url, FileManager.default.fileExists(atPath: url.path) else {
+            loadError = "The tutorial video could not be found."
+            return
+        }
+        loadError = nil
+        isReady = false
+        removeObservers()
+
+        let item = AVPlayerItem(url: url)
+        // Keeps the music's pitch normal when playing slower.
+        item.audioTimePitchAlgorithm = .spectral
+        player.automaticallyWaitsToMinimizeStalling = false
+        player.replaceCurrentItem(with: item)
+        installObservers(for: item)
+    }
+
+    /// Back to the start time, paused, so the first frame shows again.
+    func moveToStart() {
+        guard let item = player.currentItem, item.status == .readyToPlay else { return }
+        isReady = false
+        isHeld = true
+        watchingEnd = false
+        player.pause()
+
+        seekGeneration += 1
+        let generation = seekGeneration
+        let target = CMTime(seconds: startSeconds, preferredTimescale: Self.timeScale)
+        player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
+            // AVFoundation may call this on any thread: hop to the main actor.
+            guard let self else { return }
+            Task { @MainActor in
+                self.seekFinished(finished, generation: generation)
+            }
+        }
+    }
+
+    /// Starts playing at `hostTime` (iPhone host clock), from the start time.
+    func startPlayback(atHostTime hostTime: CMTime) {
+        isHeld = false
+        watchingEnd = true
+        player.automaticallyWaitsToMinimizeStalling = false
+        if player.currentItem?.status == .readyToPlay {
+            player.setRate(rate,
+                           time: CMTime(seconds: startSeconds, preferredTimescale: Self.timeScale),
+                           atHostTime: hostTime)
+        } else {
+            // Should not happen (Record is disabled until ready), but never crash.
+            player.rate = rate
+        }
+    }
+
+    /// Pauses and keeps it paused (even if a scheduled start was pending).
+    func hold() {
+        isHeld = true
+        watchingEnd = false
+        player.pause()
+    }
+
+    func currentSeconds() -> Double {
+        let seconds = player.currentTime().seconds
+        return seconds.isFinite ? max(seconds, 0) : startSeconds
+    }
+
+    func tearDown() {
+        isHeld = true
+        watchingEnd = false
+        player.pause()
+        removeObservers()
+    }
+
+    // MARK: Private
+
+    private func installObservers(for item: AVPlayerItem) {
+        statusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
+            let status = item.status
+            let message = item.error?.localizedDescription
+            guard let self else { return }
+            Task { @MainActor in
+                self.itemStatusChanged(status, message: message)
+            }
+        }
+
+        // ~30 checks per second: pauses at the end time, keeps a "held"
+        // player from playing.
+        timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 30),
+                                                      queue: .main) { [weak self] time in
+            guard let self else { return }
+            // We asked for the main queue, so we are on the main actor.
+            MainActor.assumeIsolated {
+                self.tick(time.seconds)
+            }
+        }
+
+        endObserver = NotificationCenter.default.addObserver(
+            forName: AVPlayerItem.didPlayToEndTimeNotification,
+            object: item,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            MainActor.assumeIsolated {
+                self.reachedItemEnd()
+            }
+        }
+    }
+
+    private func removeObservers() {
+        statusObservation?.invalidate()
+        statusObservation = nil
+        if let token = timeObserver {
+            player.removeTimeObserver(token)
+        }
+        timeObserver = nil
+        if let token = endObserver {
+            NotificationCenter.default.removeObserver(token)
+        }
+        endObserver = nil
+    }
+
+    private func itemStatusChanged(_ status: AVPlayerItem.Status, message: String?) {
+        switch status {
+        case .readyToPlay:
+            if !isReady { moveToStart() }
+        case .failed:
+            loadError = message ?? "The tutorial video could not be opened."
+        default:
+            break
+        }
+    }
+
+    private func seekFinished(_ finished: Bool, generation: Int) {
+        guard finished, generation == seekGeneration else { return }
+        isReady = true
+        // Get the audio/video pipeline warm so the scheduled start is on time.
+        if player.status == .readyToPlay, player.currentItem?.status == .readyToPlay {
+            player.preroll(atRate: rate) { _ in }
+        }
+    }
+
+    private func tick(_ seconds: Double) {
+        if isHeld {
+            if player.rate != 0 { player.pause() }
+            return
+        }
+        guard watchingEnd, let end = endSeconds, seconds.isFinite, seconds >= end else { return }
+        watchingEnd = false
+        onReachedEnd?()
+    }
+
+    private func reachedItemEnd() {
+        guard watchingEnd else { return }
+        watchingEnd = false
+        onReachedEnd?()
+    }
+}
+
+// MARK: - Tutorial picture
+
+/// Bridges a UIKit view that hosts an `AVPlayerLayer` into SwiftUI.
+/// The background is clear so the tutorial can be a see-through "ghost".
+@MainActor
+private struct RecordTutorialLayer: UIViewRepresentable {
+    let player: AVPlayer
+
+    func makeUIView(context: Context) -> RecordTutorialUIView {
+        let view = RecordTutorialUIView()
+        view.playerLayer.player = player
+        return view
+    }
+
+    func updateUIView(_ uiView: RecordTutorialUIView, context: Context) {
+        if uiView.playerLayer.player !== player {
+            uiView.playerLayer.player = player
+        }
+    }
+}
+
+/// A UIView whose own layer *is* an AVPlayerLayer.
+private final class RecordTutorialUIView: UIView {
+    override class var layerClass: AnyClass { AVPlayerLayer.self }
+
+    var playerLayer: AVPlayerLayer {
+        // Safe: `layerClass` above guarantees the layer type.
+        layer as! AVPlayerLayer
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        isUserInteractionEnabled = false
+        playerLayer.videoGravity = .resizeAspect
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is not used")
+    }
+}

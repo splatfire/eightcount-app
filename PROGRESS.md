@@ -23,7 +23,7 @@ User asked for (subagents must use model "sonnet" to save tokens):
 4. Liquid Glass (iOS 26+ APIs, guarded so iOS 17 still works).
 
 - [x] Foundation (me): Take model, AnalysisReport, TakeTiming, TakeStore, OrientationLock, Glass styling, Info.plist camera key
-- [ ] Recording (sonnet agent): Recording/
+- [x] Recording (sonnet agent): Recording/ (CameraRecorder, CameraPreviewView, RecordView)
 - [x] Compare (sonnet agent): Compare/ (SyncedPlayback, CompareView, TakesListView)
 - [ ] Analysis (sonnet agent): Analysis/
 - [x] Integration in ProjectDetailView (record button, My Takes, compare cover)
