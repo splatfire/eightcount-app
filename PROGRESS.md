@@ -16,7 +16,7 @@ App lives in `eightcount/`. Generate the Xcode project with `xcodegen generate` 
 ## In progress
 - Playback (PlayerController, video view, controls, fine scrubber) — subagent
 - 8-count grid UI (tempo sheet + tap tempo, count list, note editor, FrameGrabber) — subagent
-- Export/import (ProjectArchive, ShareSheet) — subagent
+- [x] Export/import DONE (Transfer/ProjectArchive.swift, ShareSheet, ExportProjectButton)
   NOTE: ProjectListView already calls `ProjectArchive.importProject(from:into:)`, so the
   project does not compile until Transfer/ProjectArchive.swift exists.
 
