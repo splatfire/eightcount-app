@@ -151,9 +151,12 @@ struct RecordView: View {
     private var mediaLayer: some View {
         GeometryReader { geo in
             let size = geo.size
+            let insets = geo.safeAreaInsets
             let landscape = size.width > size.height
             let ghost = layout == .ghost
             let rects = Self.tileRects(size: size, landscape: landscape, ghost: ghost)
+            // Badges sit just below the top buttons.
+            let belowButtons = insets.top + 56
 
             ZStack {
                 Color.black
@@ -161,8 +164,10 @@ struct RecordView: View {
                 CameraPreviewView(recorder: model.recorder)
                     .frame(width: rects.camera.width, height: rects.camera.height)
                     .clipped()
-                    .overlay(alignment: landscape ? .topTrailing : .bottomLeading) {
-                        if !ghost { badge("YOU") }
+                    .overlay(alignment: .topLeading) {
+                        if !ghost {
+                            badge("YOU", top: belowButtons, leading: insets.leading + 10)
+                        }
                     }
                     .position(x: rects.camera.midX, y: rects.camera.midY)
 
@@ -181,7 +186,9 @@ struct RecordView: View {
                         }
                     }
                     .overlay(alignment: .topLeading) {
-                        if !ghost { badge("TUTORIAL") }
+                        if !ghost {
+                            badge("TUTORIAL", top: landscape ? belowButtons : 10, leading: 10)
+                        }
                     }
                     .position(x: rects.tutorial.midX, y: rects.tutorial.midY)
                     .allowsHitTesting(false)
@@ -192,16 +199,17 @@ struct RecordView: View {
         .ignoresSafeArea()
     }
 
-    /// Small label on a picture ("YOU" / "TUTORIAL").
-    private func badge(_ title: String) -> some View {
+    /// Small translucent capsule inside a picture ("YOU" / "TUTORIAL").
+    private func badge(_ title: String, top: CGFloat, leading: CGFloat) -> some View {
         Text(title)
-            .font(.system(.caption2, design: .rounded).weight(.heavy))
-            .tracking(1)
-            .foregroundStyle(Color.white)
-            .padding(.horizontal, 8)
+            .font(.system(.caption2, design: .rounded).weight(.semibold))
+            .tracking(1.2)
+            .foregroundStyle(Color.white.opacity(0.92))
+            .padding(.horizontal, 9)
             .padding(.vertical, 4)
-            .background(Capsule().fill(Color.black.opacity(0.55)))
-            .padding(8)
+            .background(Capsule().fill(Color.black.opacity(0.42)))
+            .padding(.top, top)
+            .padding(.leading, leading)
             .accessibilityHidden(true)
     }
 
@@ -230,34 +238,52 @@ struct RecordView: View {
 
     private var controlsLayer: some View {
         VStack(spacing: 0) {
-            topChips
+            if model.phase != .saved {
+                topBar
+            }
             Spacer(minLength: 0)
             if model.phase != .saved {
-                controlBar
-                    .frame(maxWidth: 560)
+                bottomControls
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
     }
 
-    /// "● REC 0:07" while recording, plus what is going to be recorded.
-    private var topChips: some View {
-        GlassGroup(spacing: 8) {
-            VStack(spacing: 6) {
+    /// [Close] ......... "● REC 0:07" ......... [Layout]
+    private var topBar: some View {
+        GlassGroup(spacing: 10) {
+            ZStack {
+                HStack(spacing: 10) {
+                    Button {
+                        closeTapped()
+                    } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .buttonStyle(.round(size: 40))
+                    .accessibilityLabel("Close")
+
+                    Spacer(minLength: 0)
+
+                    Button {
+                        layout = (layout == .ghost) ? .sideBySide : .ghost
+                    } label: {
+                        Image(systemName: layout == .ghost ? "square.on.square" : "rectangle.split.2x1")
+                    }
+                    .buttonStyle(.round(size: 40, isOn: layout == .ghost, tint: Theme.loopColor))
+                    .disabled(model.isLayoutLocked)
+                    .opacity(model.isLayoutLocked ? 0.4 : 1)
+                    .accessibilityLabel("Layout")
+                    .accessibilityValue(layout == .ghost ? "Ghost" : "Side by side")
+                }
+
                 if model.isRecordingActive {
                     recChip
+                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
                 }
-                Text(infoText)
-                    .font(.system(.caption, design: .rounded).weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(Color.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .glassSurface(Capsule(), fallback: Theme.surface.opacity(0.85))
             }
         }
-        .opacity(model.phase == .saved ? 0 : 1)
+        .animation(.snappy, value: model.isRecordingActive)
     }
 
     private var recChip: some View {
@@ -266,15 +292,15 @@ struct RecordView: View {
             HStack(spacing: 6) {
                 Circle()
                     .fill(Color.red)
-                    .frame(width: 10, height: 10)
+                    .frame(width: 8, height: 8)
                 Text("REC \(Self.clock(elapsed))")
-                    .font(.system(.subheadline, design: .rounded).weight(.bold))
+                    .font(.system(.caption, design: .rounded).weight(.bold))
                     .monospacedDigit()
                     .foregroundStyle(Color.white)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .glassSurface(Capsule(), tint: Color.red.opacity(0.55), fallback: Color.red.opacity(0.75))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .glassSurface(Capsule(), tint: Color.red.opacity(0.45), fallback: Color.red.opacity(0.7))
         }
         .accessibilityLabel("Recording")
     }
@@ -287,65 +313,52 @@ struct RecordView: View {
         return text
     }
 
-    private var controlBar: some View {
-        GlassGroup(spacing: 12) {
-            VStack(spacing: 10) {
-                if layout == .ghost {
-                    ghostOpacityRow
-                }
-                HStack(spacing: 10) {
-                    Button {
-                        closeTapped()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.title3.weight(.bold))
-                    }
-                    .buttonStyle(.big)
-                    .frame(maxWidth: 90)
-                    .accessibilityLabel("Close")
-
-                    Button {
-                        layout = (layout == .ghost) ? .sideBySide : .ghost
-                    } label: {
-                        Label(layout == .ghost ? "Ghost" : "Side by side",
-                              systemImage: layout == .ghost ? "square.on.square" : "rectangle.split.2x1")
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
-                    .buttonStyle(.big(isOn: layout == .ghost))
-                    .disabled(model.isLayoutLocked)
-                    .opacity(model.isLayoutLocked ? 0.4 : 1)
-                    .accessibilityLabel("Layout")
-                    .accessibilityValue(layout == .ghost ? "Ghost" : "Side by side")
-
-                    recordButton
-                }
+    /// Ghost slider (ghost mode only), a small info caption and the record button.
+    private var bottomControls: some View {
+        VStack(spacing: 12) {
+            if layout == .ghost {
+                ghostOpacityRow
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
-            .padding(12)
-            .glassSurface(RoundedRectangle(cornerRadius: 30, style: .continuous),
-                          fallback: Theme.surface.opacity(0.94))
-        }
-    }
-
-    /// Slider for how see-through the tutorial "ghost" is.
-    private var ghostOpacityRow: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "circle.lefthalf.filled")
-                .foregroundStyle(Theme.secondaryText)
-                .accessibilityHidden(true)
-            Slider(value: $ghostOpacity, in: 0.2...0.8)
-                .tint(Theme.accent)
-                .accessibilityLabel("Tutorial opacity")
-            Text("\(Int((ghostOpacity * 100).rounded()))%")
-                .font(.system(.subheadline, design: .rounded).weight(.semibold))
+            Text(infoText)
+                .font(.system(.caption, design: .rounded).weight(.medium))
                 .monospacedDigit()
-                .foregroundStyle(Color.white)
-                .frame(width: 52, alignment: .trailing)
+                .foregroundStyle(Color.white.opacity(0.75))
+                .shadow(color: .black.opacity(0.6), radius: 3)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            recordButton
         }
-        .frame(minHeight: 44)
+        .padding(.top, 8)
+        .animation(.snappy, value: layout)
     }
 
-    /// Red circle = record, red square = stop.
+    /// Slim slider for how see-through the tutorial "ghost" is.
+    private var ghostOpacityRow: some View {
+        GlassGroup(spacing: 8) {
+            HStack(spacing: 10) {
+                Image(systemName: "circle.lefthalf.filled")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.85))
+                    .accessibilityHidden(true)
+                Slider(value: $ghostOpacity, in: 0.2...0.8)
+                    .tint(Color.white)
+                    .accessibilityLabel("Tutorial opacity")
+                Text("\(Int((ghostOpacity * 100).rounded()))%")
+                    .font(.system(.caption, design: .rounded).weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(Color.white)
+                    .frame(width: 40, alignment: .trailing)
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 36)
+            .glassSurface(Capsule(), fallback: Theme.surface.opacity(0.85))
+        }
+        .frame(maxWidth: 320)
+    }
+
+    /// Classic camera shutter: white ring with a red circle that morphs into
+    /// a rounded red square while recording.
     private var recordButton: some View {
         let isStop = model.canStop
         let enabled = model.canStart || model.canStop
@@ -356,23 +369,17 @@ struct RecordView: View {
                 Circle()
                     .strokeBorder(Color.white, lineWidth: 4)
                     .frame(width: 72, height: 72)
-                if isStop {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.red)
-                        .frame(width: 28, height: 28)
-                } else {
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 56, height: 56)
-                }
+                RoundedRectangle(cornerRadius: isStop ? 8 : 28, style: .continuous)
+                    .fill(Color.red)
+                    .frame(width: isStop ? 30 : 56, height: isStop ? 30 : 56)
             }
             .frame(width: 80, height: 80)
             .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(RecordShutterPressStyle())
         .disabled(!enabled)
         .opacity(enabled ? 1 : 0.4)
-        .animation(.snappy, value: isStop)
+        .animation(.spring(response: 0.35, dampingFraction: 0.75), value: isStop)
         .accessibilityLabel(isStop ? "Stop recording" : "Start recording")
     }
 
@@ -382,28 +389,33 @@ struct RecordView: View {
     private var countdownOverlay: some View {
         if let value = model.countdownValue {
             ZStack {
-                Color.black.opacity(0.35).ignoresSafeArea()
-                VStack(spacing: 4) {
-                    Text("Get ready")
-                        .font(.system(.title3, design: .rounded).weight(.semibold))
-                        .foregroundStyle(Color.white.opacity(0.9))
+                Color.black.opacity(0.3).ignoresSafeArea()
+                VStack(spacing: 0) {
+                    Text("GET READY")
+                        .font(.system(.footnote, design: .rounded).weight(.semibold))
+                        .tracking(2)
+                        .foregroundStyle(Color.white.opacity(0.8))
                     Text("\(value)")
-                        .font(.system(size: 160, weight: .heavy, design: .rounded))
+                        .font(.system(size: 150, weight: .heavy, design: .rounded))
+                        .monospacedDigit()
                         .foregroundStyle(Color.white)
                         .id(value)
-                        .transition(.scale(scale: 1.6).combined(with: .opacity))
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 1.35).combined(with: .opacity),
+                            removal: .scale(scale: 0.8).combined(with: .opacity)
+                        ))
                 }
-                .shadow(color: .black.opacity(0.5), radius: 12)
+                .shadow(color: .black.opacity(0.45), radius: 14)
             }
             .allowsHitTesting(false)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Starting in \(value)")
         } else if model.showGo {
             Text("GO!")
-                .font(.system(size: 120, weight: .heavy, design: .rounded))
+                .font(.system(size: 110, weight: .heavy, design: .rounded))
                 .foregroundStyle(Theme.accent)
-                .shadow(color: .black.opacity(0.5), radius: 12)
-                .transition(.scale(scale: 1.4).combined(with: .opacity))
+                .shadow(color: .black.opacity(0.45), radius: 14)
+                .transition(.scale(scale: 1.3).combined(with: .opacity))
                 .allowsHitTesting(false)
         }
     }
@@ -414,44 +426,51 @@ struct RecordView: View {
         ZStack {
             Color.black.opacity(0.45).ignoresSafeArea()
 
-            VStack(spacing: 12) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 40))
-                    .foregroundStyle(Color.green)
-                    .accessibilityHidden(true)
-                Text("Saved!")
-                    .font(.system(.title, design: .rounded).weight(.bold))
-                    .foregroundStyle(Color.white)
-                Text("Your recording is saved in this project.")
-                    .font(.subheadline)
-                    .foregroundStyle(Theme.secondaryText)
-                    .multilineTextAlignment(.center)
+            VStack(spacing: 14) {
+                VStack(spacing: 4) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(Color.green)
+                            .accessibilityHidden(true)
+                        Text("Saved")
+                            .foregroundStyle(Color.white)
+                    }
+                    .font(.system(.title3, design: .rounded).weight(.bold))
 
-                GlassGroup(spacing: 10) {
-                    VStack(spacing: 10) {
-                        Button("Compare") {
-                            model.finish(with: model.savedTake)
+                    Text("Your recording is saved in this project.")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.secondaryText)
+                        .multilineTextAlignment(.center)
+                }
+
+                VStack(spacing: 10) {
+                    Button {
+                        model.finish(with: model.savedTake)
+                    } label: {
+                        Text("Compare")
+                    }
+                    .buttonStyle(RecordCapsuleButtonStyle(prominent: true))
+
+                    HStack(spacing: 10) {
+                        Button {
+                            model.recordAgain()
+                        } label: {
+                            Text("Record again")
                         }
-                        .buttonStyle(.big(isOn: true))
+                        .buttonStyle(RecordCapsuleButtonStyle())
 
-                        HStack(spacing: 10) {
-                            Button("Record again") {
-                                model.recordAgain()
-                            }
-                            .buttonStyle(.big)
-
-                            Button("Done") {
-                                model.finish(with: nil)
-                            }
-                            .buttonStyle(.big)
+                        Button {
+                            model.finish(with: nil)
+                        } label: {
+                            Text("Done")
                         }
+                        .buttonStyle(RecordCapsuleButtonStyle())
                     }
                 }
             }
-            .padding(20)
-            .frame(maxWidth: 380)
-            .glassSurface(RoundedRectangle(cornerRadius: 28, style: .continuous),
-                          fallback: Theme.surface)
+            .frame(maxWidth: .infinity)
+            .card(padding: 20)
+            .frame(maxWidth: 360)
             .padding(16)
         }
     }
@@ -479,12 +498,14 @@ struct RecordView: View {
             } label: {
                 Label("Open Settings", systemImage: "gearshape")
             }
-            .buttonStyle(.big(isOn: true))
+            .buttonStyle(RecordCapsuleButtonStyle(prominent: true))
 
-            Button("Close") {
+            Button {
                 model.finish(with: nil)
+            } label: {
+                Text("Close")
             }
-            .buttonStyle(.big)
+            .buttonStyle(RecordCapsuleButtonStyle())
         }
         .padding(24)
         .frame(maxWidth: 420)
@@ -518,6 +539,50 @@ struct RecordView: View {
 private enum RecordLayout {
     case sideBySide
     case ghost
+}
+
+/// The shutter button just shrinks a little while pressed.
+private struct RecordShutterPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.92 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
+/// Capsule button: solid accent when `prominent`, otherwise glass.
+private struct RecordCapsuleButtonStyle: ButtonStyle {
+    var prominent = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(.subheadline, design: .rounded).weight(.semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .foregroundStyle(prominent ? Color.black : Color.white)
+            .frame(maxWidth: .infinity, minHeight: Theme.controlHeight)
+            .background {
+                if prominent {
+                    Capsule().fill(Theme.accent)
+                }
+            }
+            .modifier(RecordCapsuleGlass(prominent: prominent))
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.snappy(duration: 0.15), value: configuration.isPressed)
+            .contentShape(Capsule())
+    }
+}
+
+private struct RecordCapsuleGlass: ViewModifier {
+    let prominent: Bool
+
+    func body(content: Content) -> some View {
+        if prominent {
+            content
+        } else {
+            content.glassSurface(Capsule(), interactive: true, fallback: Theme.surfaceRaised)
+        }
+    }
 }
 
 // MARK: - The record flow

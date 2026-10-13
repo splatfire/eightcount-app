@@ -98,7 +98,7 @@ struct CompareView: View {
 
     /// The videos plus the floating controls. Tapping the video hides/shows them.
     private func videoRegion(landscape: Bool, insets: EdgeInsets) -> some View {
-        videoArea(landscape: landscape)
+        videoArea(landscape: landscape, insets: insets)
             .contentShape(Rectangle())
             .onTapGesture {
                 controlsVisible.toggle()
@@ -109,7 +109,7 @@ struct CompareView: View {
                 }
             }
             .overlay(alignment: .bottom) {
-                // Landscape: a compact bar floats over the bottom of the videos.
+                // Landscape: a compact panel floats over the bottom of the videos.
                 if landscape && controlsVisible {
                     landscapeBar(insets: insets)
                 }
@@ -117,7 +117,9 @@ struct CompareView: View {
     }
 
     @ViewBuilder
-    private func videoArea(landscape: Bool) -> some View {
+    private func videoArea(landscape: Bool, insets: EdgeInsets) -> some View {
+        // The YOU badge sits below the top buttons while they are visible.
+        let youTop = max(insets.top, 8) + (controlsVisible ? 48 : 0)
         ZStack {
             Color.black
 
@@ -127,10 +129,10 @@ struct CompareView: View {
                     ? AnyLayout(HStackLayout(spacing: 2))
                     : AnyLayout(VStackLayout(spacing: 2))
                 layout {
-                    pane(title: "YOU", badge: landscape ? .topTrailing : .bottomLeading) {
+                    pane(title: "YOU", top: youTop, leading: insets.leading + 10) {
                         youVideo
                     }
-                    pane(title: "TUTORIAL", badge: landscape ? .topLeading : .bottomLeading) {
+                    pane(title: "TUTORIAL", top: 10, leading: 10) {
                         tutorialVideo
                     }
                 }
@@ -148,20 +150,22 @@ struct CompareView: View {
         }
     }
 
-    /// One video with a small capsule badge in a corner.
-    private func pane<Content: View>(title: String, badge: Alignment,
+    /// One video with a small translucent capsule badge in its top-leading corner.
+    private func pane<Content: View>(title: String, top: CGFloat, leading: CGFloat,
                                      @ViewBuilder content: () -> Content) -> some View {
-        ZStack(alignment: badge) {
+        ZStack(alignment: .topLeading) {
             content()
             Text(title)
-                .font(.system(.caption2, design: .rounded).weight(.heavy))
-                .tracking(1)
-                .foregroundStyle(Color.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Capsule().fill(Color.black.opacity(0.55)))
-                .padding(8)
+                .font(.system(.caption2, design: .rounded).weight(.semibold))
+                .tracking(1.2)
+                .foregroundStyle(Color.white.opacity(0.92))
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(Color.black.opacity(0.42)))
+                .padding(.top, top)
+                .padding(.leading, leading)
                 .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
@@ -197,15 +201,14 @@ struct CompareView: View {
     // MARK: - Top row (close, layout, mirror, sync, analyze)
 
     private func topRow(insets: EdgeInsets) -> some View {
-        GlassGroup(spacing: 8) {
-            HStack(spacing: 8) {
+        GlassGroup(spacing: 10) {
+            HStack(spacing: 10) {
                 Button {
                     dismiss()
                 } label: {
                     Image(systemName: "xmark")
                 }
-                .buttonStyle(.big)
-                .frame(width: 56)
+                .buttonStyle(.round(size: 40))
                 .accessibilityLabel("Close")
 
                 Spacer(minLength: 0)
@@ -213,10 +216,9 @@ struct CompareView: View {
                 Button {
                     isSideBySide.toggle()
                 } label: {
-                    Image(systemName: "square.on.square")
+                    Image(systemName: isSideBySide ? "rectangle.split.2x1" : "square.on.square")
                 }
-                .buttonStyle(.big(isOn: !isSideBySide, tint: Theme.loopColor))
-                .frame(width: 56)
+                .buttonStyle(.round(size: 40, isOn: !isSideBySide, tint: Theme.loopColor))
                 .accessibilityLabel(isSideBySide ? "Switch to overlay" : "Switch to side by side")
 
                 mirrorMenu
@@ -224,10 +226,9 @@ struct CompareView: View {
                 Button {
                     showSync = true
                 } label: {
-                    Text("Sync")
+                    Image(systemName: "timer")
                 }
-                .buttonStyle(.big(isOn: abs(playback.nudge) > 0.0005, tint: Theme.loopColor))
-                .frame(width: 72)
+                .buttonStyle(.round(size: 40, isOn: abs(playback.nudge) > 0.0005, tint: Theme.loopColor))
                 .accessibilityLabel("Sync")
                 .popover(isPresented: $showSync) {
                     CompareSyncPanel(playback: playback) {
@@ -247,8 +248,7 @@ struct CompareView: View {
                 } label: {
                     Image(systemName: "sparkles")
                 }
-                .buttonStyle(.big)
-                .frame(width: 56)
+                .buttonStyle(.round(size: 40, isOn: true))
                 .accessibilityLabel("Analyze")
             }
         }
@@ -264,55 +264,58 @@ struct CompareView: View {
             Toggle("Mirror tutorial", isOn: $mirrorTutorial)
         } label: {
             Image(systemName: "arrow.left.and.right.righttriangle.left.righttriangle.right")
-                .font(.system(.headline, design: .rounded))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Color.white)
-                .frame(width: 56, height: Theme.tapHeight)
-                .glassSurface(RoundedRectangle(cornerRadius: 14, style: .continuous), interactive: true)
-                .contentShape(Rectangle())
+                .frame(width: 40, height: 40)
+                .glassSurface(Circle(), interactive: true)
+                .contentShape(Circle())
         }
         .accessibilityLabel("Mirror options")
     }
 
-    // MARK: - Bottom bars
+    // MARK: - Bottom controls
 
     private func portraitBar(insets: EdgeInsets) -> some View {
-        GlassGroup(spacing: 8) {
-            VStack(spacing: 8) {
-                scrubRow
+        GlassGroup(spacing: 10) {
+            VStack(spacing: 14) {
                 if !isSideBySide {
                     ghostRow
                 }
-                HStack(spacing: 8) {
-                    frameBackButton.frame(width: 64)
-                    playButton
-                    frameForwardButton.frame(width: 64)
-                    loopButton.frame(width: 64)
-                }
-                speedRow
+                timelineBlock
+                transportRow(compact: false)
+                speedPicker
             }
         }
-        .padding(.horizontal, max(insets.leading, insets.trailing, 12))
-        .padding(.top, 8)
-        .padding(.bottom, max(insets.bottom, 8))
+        .padding(.horizontal, max(insets.leading, insets.trailing) + 16)
+        .padding(.top, 10)
+        .padding(.bottom, max(insets.bottom, 10))
         .background(Color.black)
     }
 
     private func landscapeBar(insets: EdgeInsets) -> some View {
-        GlassGroup(spacing: 8) {
-            VStack(spacing: 8) {
-                scrubRow
+        GlassGroup(spacing: 10) {
+            VStack(spacing: 6) {
                 if !isSideBySide {
                     ghostRow
                 }
-                HStack(spacing: 8) {
-                    frameBackButton.frame(width: 56)
-                    playButton.frame(width: 84)
-                    frameForwardButton.frame(width: 56)
-                    loopButton.frame(width: 56)
-                    speedRow
+                timelineBlock
+                HStack(spacing: 16) {
+                    transportRow(compact: true)
+                    speedPicker
+                        .frame(maxWidth: .infinity)
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background {
+                let shape = RoundedRectangle(cornerRadius: 28, style: .continuous)
+                shape
+                    .fill(.ultraThinMaterial)
+                    .overlay(shape.fill(Color.black.opacity(0.3)))
+                    .overlay(shape.strokeBorder(Theme.hairline, lineWidth: 1))
+            }
         }
+        .frame(maxWidth: 640)
         .padding(.leading, insets.leading + 12)
         .padding(.trailing, insets.trailing + 12)
         .padding(.bottom, max(insets.bottom, 8))
@@ -320,131 +323,139 @@ struct CompareView: View {
 
     // MARK: - Control pieces
 
-    private var playButton: some View {
-        Button {
-            playback.togglePlayPause()
-        } label: {
-            Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
-                .font(.title2)
-        }
-        .buttonStyle(.big(isOn: true))
-        .disabled(!playback.isReady)
-        .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
-    }
-
-    private var frameBackButton: some View {
-        Button {
-            playback.stepFrames(-1)
-        } label: {
-            Image(systemName: "backward.frame.fill")
-        }
-        .buttonStyle(.big)
-        .disabled(!playback.isReady)
-        .accessibilityLabel("Back one frame")
-    }
-
-    private var frameForwardButton: some View {
-        Button {
-            playback.stepFrames(1)
-        } label: {
-            Image(systemName: "forward.frame.fill")
-        }
-        .buttonStyle(.big)
-        .disabled(!playback.isReady)
-        .accessibilityLabel("Forward one frame")
-    }
-
-    private var loopButton: some View {
-        Button {
-            playback.isLooping.toggle()
-        } label: {
-            Image(systemName: "repeat")
-        }
-        .buttonStyle(.big(isOn: playback.isLooping, tint: Theme.loopColor))
-        .accessibilityLabel(playback.isLooping ? "Loop on" : "Loop off")
-    }
-
-    private var speedRow: some View {
-        HStack(spacing: 6) {
-            ForEach(SyncedPlayback.speeds, id: \.self) { speed in
-                Button {
-                    playback.setRate(speed)
-                } label: {
-                    Text(SyncedPlayback.speedLabel(Double(speed)))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
-                .buttonStyle(.big(isOn: playback.rate == speed))
-                .accessibilityLabel("Speed \(SyncedPlayback.speedLabel(Double(speed)))")
+    /// [Back one frame] [Play / Pause] [Forward one frame] [Loop]
+    private func transportRow(compact: Bool) -> some View {
+        let side: CGFloat = compact ? 40 : 48
+        let playSize: CGFloat = compact ? 52 : 60
+        let loopSize: CGFloat = compact ? 40 : 44
+        return HStack(spacing: compact ? 12 : 20) {
+            Button {
+                playback.stepFrames(-1)
+            } label: {
+                Image(systemName: "backward.frame.fill")
             }
+            .buttonStyle(.round(size: side))
+            .buttonRepeatBehavior(.enabled)
+            .disabled(!playback.isReady)
+            .accessibilityLabel("Back one frame")
+
+            Button {
+                playback.togglePlayPause()
+            } label: {
+                Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .buttonStyle(.round(size: playSize, prominent: true))
+            .disabled(!playback.isReady)
+            .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
+
+            Button {
+                playback.stepFrames(1)
+            } label: {
+                Image(systemName: "forward.frame.fill")
+            }
+            .buttonStyle(.round(size: side))
+            .buttonRepeatBehavior(.enabled)
+            .disabled(!playback.isReady)
+            .accessibilityLabel("Forward one frame")
+
+            Button {
+                playback.isLooping.toggle()
+            } label: {
+                Image(systemName: "repeat")
+            }
+            .buttonStyle(.round(size: loopSize, isOn: playback.isLooping, tint: Theme.loopColor))
+            .accessibilityLabel(playback.isLooping ? "Loop on" : "Loop off")
         }
+        .animation(.snappy, value: playback.isPlaying)
+        .animation(.snappy, value: playback.isLooping)
+        .opacity(playback.isReady ? 1 : 0.45)
     }
 
-    // MARK: - Scrubber
+    private var speedPicker: some View {
+        let options = SyncedPlayback.speeds.map { speed -> PillPicker<Float>.Option in
+            let title = SyncedPlayback.speedLabel(Double(speed))
+            return PillPicker<Float>.Option(
+                value: speed,
+                title: title,
+                accessibilityLabel: "Speed \(title)"
+            )
+        }
+        return PillPicker<Float>(
+            options: options,
+            selection: playback.rate,
+            onSelect: { playback.setRate($0) }
+        )
+    }
+
+    // MARK: - Timeline
 
     private var shownTime: Double {
         isScrubbing ? scrubTime : playback.currentTime
     }
 
-    /// Slider needs a non-empty range, even before loading finishes.
-    private var sliderRange: ClosedRange<Double> {
-        let lower = playback.range.lowerBound
-        return lower...max(playback.range.upperBound, lower + 0.01)
+    private var timelineBlock: some View {
+        VStack(spacing: 2) {
+            CompareTimelineBar(
+                value: shownTime,
+                lower: playback.range.lowerBound,
+                upper: playback.range.upperBound,
+                isDragging: isScrubbing,
+                onScrub: { scrubChanged($0) },
+                onScrubEnd: { scrubEnded($0) },
+                onNudge: { playback.seek(to: shownTime + $0) }
+            )
+            timeLabels
+        }
+        .disabled(!playback.isReady)
+        .opacity(playback.isReady ? 1 : 0.45)
     }
 
-    private var scrubRow: some View {
-        VStack(spacing: 2) {
-            Slider(
-                value: Binding(
-                    get: { min(max(shownTime, sliderRange.lowerBound), sliderRange.upperBound) },
-                    set: { newValue in
-                        scrubTime = newValue
-                        playback.seek(to: newValue)   // live preview while dragging
-                    }
-                ),
-                in: sliderRange,
-                onEditingChanged: scrubEditingChanged
-            )
-            .tint(Theme.accent)
-            .disabled(!playback.isReady)
-            .accessibilityLabel("Position")
-            .accessibilityValue(formatTime(shownTime))
-
-            HStack(alignment: .firstTextBaseline) {
-                Text("\(formatTime(shownTime)) / \(formatTime(playback.range.upperBound))")
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(Color.white.opacity(0.8))
-                    .lineLimit(1)
+    private var timeLabels: some View {
+        let remaining = max(playback.range.upperBound - shownTime, 0)
+        return ZStack {
+            HStack {
+                Text(formatTime(shownTime))
                 Spacer(minLength: 8)
-                if let label = countLabel {
-                    Text(label)
-                        .font(.system(.subheadline, design: .rounded).weight(.bold))
-                        .monospacedDigit()
-                        .foregroundStyle(Theme.accent)
-                        .lineLimit(1)
-                }
+                Text(formatTime(-remaining))
+            }
+            .font(.system(.caption, design: .monospaced))
+            .foregroundStyle(Theme.secondaryText)
+            .lineLimit(1)
+
+            if let label = countLabel {
+                Text(label)
+                    .font(.system(.caption2, design: .rounded).weight(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.accent)
+                    .lineLimit(1)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Theme.accent.opacity(0.16)))
+                    .transition(.opacity)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .glassSurface(RoundedRectangle(cornerRadius: 14, style: .continuous),
-                      fallback: Color.black.opacity(0.55))
+        .animation(.snappy, value: countLabel)
+        .accessibilityElement(children: .combine)
     }
 
-    private func scrubEditingChanged(_ editing: Bool) {
-        if editing {
+    private func scrubChanged(_ time: Double) {
+        if !isScrubbing {
             // Finger down: remember if we were playing, then pause.
-            scrubTime = playback.currentTime
             wasPlayingBeforeScrub = playback.isPlaying
             isScrubbing = true
             playback.pause()
-        } else {
-            // Finger up: land exactly where the thumb is.
-            playback.seek(to: scrubTime)
-            isScrubbing = false
-            if wasPlayingBeforeScrub {
-                playback.play()
-            }
+        }
+        scrubTime = time
+        playback.seek(to: time)   // live preview while dragging
+    }
+
+    private func scrubEnded(_ time: Double) {
+        // Finger up: land exactly where the knob is.
+        playback.seek(to: time)
+        isScrubbing = false
+        if wasPlayingBeforeScrub {
+            playback.play()
         }
     }
 
@@ -461,18 +472,15 @@ struct CompareView: View {
     private var ghostRow: some View {
         HStack(spacing: 10) {
             Image(systemName: "circle.lefthalf.filled")
-                .foregroundStyle(Color.white.opacity(0.8))
-            Text("Ghost")
-                .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                .foregroundStyle(Color.white)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.secondaryText)
+                .accessibilityHidden(true)
             Slider(value: $ghostOpacity, in: 0.2...0.8)
                 .tint(Theme.loopColor)
                 .accessibilityLabel("Tutorial ghost opacity")
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .glassSurface(RoundedRectangle(cornerRadius: 14, style: .continuous),
-                      fallback: Color.black.opacity(0.55))
+        .padding(.horizontal, 4)
+        .frame(height: 32)
     }
 }
 
@@ -520,13 +528,14 @@ private struct CompareSyncPanel: View {
                             } label: {
                                 Label("Reset", systemImage: "arrow.counterclockwise")
                             }
-                            .buttonStyle(.big)
+                            .buttonStyle(CompareCapsuleButtonStyle())
                             .disabled(abs(playback.nudge) < 0.0005)
+                            .opacity(abs(playback.nudge) < 0.0005 ? 0.4 : 1)
 
                             Button(action: onAnalyze) {
                                 Label("Analyze", systemImage: "sparkles")
                             }
-                            .buttonStyle(.big(isOn: true))
+                            .buttonStyle(CompareCapsuleButtonStyle(prominent: true))
                         }
                     }
                 }
@@ -549,7 +558,118 @@ private struct CompareSyncPanel: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
-        .buttonStyle(.big)
+        .buttonStyle(CompareCapsuleButtonStyle())
+    }
+}
+
+/// Capsule button for the sync panel: glass, or solid accent when `prominent`.
+private struct CompareCapsuleButtonStyle: ButtonStyle {
+    var prominent = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(.subheadline, design: .rounded).weight(.semibold))
+            .foregroundStyle(prominent ? Color.black : Color.white)
+            .frame(maxWidth: .infinity, minHeight: Theme.controlHeight)
+            .background {
+                if prominent {
+                    Capsule().fill(Theme.accent)
+                }
+            }
+            .modifier(CompareCapsuleGlass(prominent: prominent))
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.snappy(duration: 0.15), value: configuration.isPressed)
+            .contentShape(Capsule())
+    }
+}
+
+private struct CompareCapsuleGlass: ViewModifier {
+    let prominent: Bool
+
+    func body(content: Content) -> some View {
+        if prominent {
+            content
+        } else {
+            content.glassSurface(Capsule(), interactive: true, fallback: Theme.surfaceRaised)
+        }
+    }
+}
+
+// MARK: - Timeline scrubber
+
+/// A slim custom scrubber: 4 pt track, accent fill, 14 pt knob, and a 32 pt
+/// tall hit area where you can tap or drag to seek. `lower...upper` is the
+/// part of the tutorial that your take covers.
+private struct CompareTimelineBar: View {
+    let value: Double
+    let lower: Double
+    let upper: Double
+    let isDragging: Bool
+    let onScrub: (Double) -> Void
+    let onScrubEnd: (Double) -> Void
+    let onNudge: (Double) -> Void
+
+    private let knobSize: CGFloat = 14
+    private let trackHeight: CGFloat = 4
+
+    private var span: Double { max(upper - lower, 0.0001) }
+
+    var body: some View {
+        GeometryReader { geo in
+            let inset = knobSize / 2
+            let usable = max(geo.size.width - knobSize, 1)
+            let x = inset + usable * fraction(of: value)
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.white.opacity(0.15))
+                    .frame(height: trackHeight)
+
+                Capsule()
+                    .fill(Theme.accent)
+                    .frame(width: x, height: trackHeight)
+
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: knobSize, height: knobSize)
+                    .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
+                    .scaleEffect(isDragging ? 1.35 : 1)
+                    .animation(.snappy, value: isDragging)
+                    .offset(x: x - inset)
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { drag in
+                        onScrub(time(atX: drag.location.x, inset: inset, usable: usable))
+                    }
+                    .onEnded { drag in
+                        onScrubEnd(time(atX: drag.location.x, inset: inset, usable: usable))
+                    }
+            )
+        }
+        .frame(height: 32)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Position")
+        .accessibilityValue(formatTime(value))
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: onNudge(1)
+            case .decrement: onNudge(-1)
+            @unknown default: break
+            }
+        }
+    }
+
+    private func fraction(of seconds: Double) -> CGFloat {
+        guard seconds.isFinite else { return 0 }
+        return CGFloat(min(max((seconds - lower) / span, 0), 1))
+    }
+
+    private func time(atX x: CGFloat, inset: CGFloat, usable: CGFloat) -> Double {
+        let f = min(max((x - inset) / usable, 0), 1)
+        return lower + Double(f) * span
     }
 }
 
