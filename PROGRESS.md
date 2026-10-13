@@ -55,10 +55,12 @@ User asked for (subagents must use model "sonnet" to save tokens):
   Apple-ID sign-in / Trust / Developer Mode. CI job "setup-mac.sh (Xcode 27)" verifies it on macOS
   (green, run 38443989478). Added eightcount/CLAUDE.md for a local Claude Code session.
 - This cloud session can't reach the Mac: the device install itself is run by the user.
+- 2026-10-13: user ran `setup-mac.sh --install` on their Mac (Xcode 27.0, free Apple ID).
+  Signed, installed and RUNNING on their iPhone after trusting the developer certificate. ✅
 
 ## Next step
-- User, on the Mac: clone branch `claude/nice-bardeen-84bg5p`, run `eightcount/setup-mac.sh --install`
-  (iPhone connected). Then test on device: camera recording, real analysis, Apple Intelligence tips.
+- User tests on device: camera recording, real analysis, Apple Intelligence tips; report any issues.
+- Free Apple ID: re-run `./setup-mac.sh --install --no-open` every 7 days.
 - Nice-to-haves: README → Next steps.
 
 ## Open problems
