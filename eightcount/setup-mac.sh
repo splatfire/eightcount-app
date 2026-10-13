@@ -38,7 +38,8 @@ if [ -n "$TEAM_ID" ]; then
 fi
 if [ -n "$BUNDLE_ID" ]; then
   echo "==> Saving bundle ID $BUNDLE_ID in project.yml"
-  sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER: .*/PRODUCT_BUNDLE_IDENTIFIER: $BUNDLE_ID/" project.yml
+  sed -i '' -E "s/PRODUCT_BUNDLE_IDENTIFIER: [^ ]+  # app bundle ID/PRODUCT_BUNDLE_IDENTIFIER: $BUNDLE_ID  # app bundle ID/" project.yml
+  sed -i '' -E "s/PRODUCT_BUNDLE_IDENTIFIER: [^ ]+\.uitests$/PRODUCT_BUNDLE_IDENTIFIER: $BUNDLE_ID.uitests/" project.yml
 fi
 
 echo "==> Generating EightCount.xcodeproj"

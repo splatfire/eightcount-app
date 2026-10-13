@@ -66,70 +66,81 @@ jobs:
           echo "=== WARNINGS (first 80) ==="
           grep -E "warning:" build.log | sort -u | head -80 || true
 
-  # Runtime smoke test: launch the app in an iOS Simulator, make sure it
-  # doesn't crash, and keep a screenshot (Actions run → Artifacts).
-  smoke:
-    name: Launch in Simulator (Xcode 27)
+  # Runtime test: a UI test taps through the app in an iOS Simulator with a
+  # generated test video (practice, loop, notes, takes, compare, analysis).
+  # Screenshots: Actions run → Artifacts → ui-screenshots.
+  uitest:
+    name: UI test in Simulator (Xcode 27)
     runs-on: xcode-27
-    timeout-minutes: 40
+    timeout-minutes: 50
     defaults:
       run:
         working-directory: eightcount
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install XcodeGen and generate project
-        run: (command -v xcodegen || brew install xcodegen) && xcodegen generate
-
-      - name: Pick and boot an iPhone simulator
+      - name: Install tools
         run: |
+          command -v xcodegen || brew install xcodegen
+          command -v ffmpeg || brew install ffmpeg
+
+      - name: Make a 20 s test video (portrait, test pattern + tone)
+        run: |
+          ffmpeg -loglevel error -y \
+            -f lavfi -i testsrc2=size=720x1280:rate=30 \
+            -f lavfi -i sine=frequency=440:sample_rate=44100 \
+            -t 20 -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest demo.mp4
+          ls -la demo.mp4
+
+      - name: Generate project and pick a simulator
+        run: |
+          xcodegen generate
           UDID=$(xcrun simctl list devices available -j | python3 -c '
           import json, sys
           d = json.load(sys.stdin)["devices"]
-          runtimes = sorted((r for r in d if "iOS" in r), reverse=True)
-          for r in runtimes:
+          for r in sorted((r for r in d if "iOS" in r), reverse=True):
               for dev in d[r]:
                   if dev["name"].startswith("iPhone"):
                       print(dev["udid"]); sys.exit(0)
           sys.exit(1)')
           echo "UDID=$UDID" >> "$GITHUB_ENV"
           xcrun simctl list devices | grep "$UDID"
-          xcrun simctl boot "$UDID"
-          xcrun simctl bootstatus "$UDID" -b
 
-      - name: Build for the simulator
+      - name: Run UI test
         run: |
           set -o pipefail
-          xcodebuild build \
-            -project EightCount.xcodeproj -scheme EightCount -configuration Debug \
-            -destination "id=$UDID" -derivedDataPath build/sim \
-            2>&1 | tee sim-build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
-          test -d build/sim/Build/Products/Debug-iphonesimulator/EightCount.app
+          mkdir -p shots
+          TEST_RUNNER_SEED_VIDEO="$PWD/demo.mp4" TEST_RUNNER_SHOTS_DIR="$PWD/shots" \
+          xcodebuild test \
+            -project EightCount.xcodeproj -scheme EightCount \
+            -destination "id=$UDID" -resultBundlePath ui.xcresult \
+            2>&1 | tee test.log | grep -E "error:|Test Case|TEST (SUCCEEDED|FAILED)|XCTAssert|Not found|crash" || true
+          grep -q "TEST SUCCEEDED" test.log
 
-      - name: Install, launch and check for crashes
+      - name: Crash reports (if any)
+        if: failure()
         run: |
-          APP=build/sim/Build/Products/Debug-iphonesimulator/EightCount.app
-          xcrun simctl install "$UDID" "$APP"
-          OUT=$(xcrun simctl launch "$UDID" io.github.splatfire.eightcount)
-          echo "$OUT"
-          PID=$(echo "$OUT" | awk -F': ' '{print $2}')
-          sleep 12
-          xcrun simctl io "$UDID" screenshot launch.png
-          if ps -p "$PID" > /dev/null; then
-            echo "App is still running after 12 s: no launch crash."
-          else
-            echo "App is NOT running — it crashed. Recent crash reports:"
-            ls -t ~/Library/Logs/DiagnosticReports/ | grep -i eightcount | head -3 || true
-            for f in $(ls -t ~/Library/Logs/DiagnosticReports/ | grep -i eightcount | head -1); do
-              head -120 ~/Library/Logs/DiagnosticReports/"$f"
-            done
-            exit 1
-          fi
+          for f in $(ls -t ~/Library/Logs/DiagnosticReports/ 2>/dev/null | grep -i eightcount | head -2); do
+            echo "=== $f"; head -150 ~/Library/Logs/DiagnosticReports/"$f"
+          done
 
-      - name: Save screenshot
+      - name: Print screenshots (small, base64) for remote review
+        if: always()
+        run: |
+          for f in shots/*.png; do
+            [ -e "$f" ] || continue
+            sips -Z 420 -s format jpeg -s formatOptions 35 "$f" --out small.jpg >/dev/null
+            echo "SHOT_BEGIN $(basename "$f")"
+            base64 -i small.jpg | fold -w 3000
+            echo "SHOT_END"
+          done
+
+      - name: Save screenshots and test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: simulator-screenshot
-          path: eightcount/launch.png
+          name: ui-screenshots
+          path: |
+            eightcount/shots
+            eightcount/ui.xcresult
           if-no-files-found: ignore

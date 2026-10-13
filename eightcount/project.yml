@@ -24,7 +24,7 @@ targets:
       base:
         # Must be unique across all Apple developers. If Xcode says it
         # "cannot register" this ID, change it (e.g. add your name).
-        PRODUCT_BUNDLE_IDENTIFIER: io.github.splatfire.eightcount
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.splatfire.eightcount  # app bundle ID
         # Paste your Team ID here so you don't have to re-pick the team in
         # Xcode every time you run `xcodegen generate` (see README).
         DEVELOPMENT_TEAM: ""
@@ -35,4 +35,21 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_PREVIEWS: YES
-    scheme: {}
+    scheme:
+      testTargets:
+        - EightCountUITests
+
+  # Automatic UI tests (run on GitHub's Macs; you don't need them to use the app).
+  EightCountUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: EightCountUITests
+    dependencies:
+      - target: EightCount
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.splatfire.eightcount.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic

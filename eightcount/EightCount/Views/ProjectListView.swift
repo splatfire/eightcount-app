@@ -27,6 +27,10 @@ struct ProjectListView: View {
                 }
             }
             .navigationTitle("EightCount")
+            #if DEBUG
+            // Only for the automatic UI tests (does nothing in normal use).
+            .onAppear { DebugSeed.runIfRequested(context: modelContext) }
+            #endif
             .navigationDestination(for: Project.self) { project in
                 ProjectDetailView(project: project)
             }
