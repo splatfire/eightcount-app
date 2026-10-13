@@ -14,10 +14,67 @@ tutorial and dance-practice videos:
   lyric cue.
 - **Pose snapshots**: grab the current frame and attach it to the 8-count.
 - **Projects**: one per song or section. Create, rename, delete (always confirmed).
-- **Export / import** a project's notes and snapshots (not the video) as one
-  file, so you can back them up or send them to someone in your group.
+- **Recording, compare & AI analysis**
+- **AI runs fully on the iPhone** (your choice). Vision body tracking plus
+  Apple's Foundation Models framework. No API key, no cost, nothing uploaded.
+- **Recordings have no sound** (no microphone needed). The compare screen
+  plays the tutorial's music.
+- **What gets recorded:** recording starts at the current video position,
+  at the current speed and mirror setting. If an A-B loop or a looped
+  8-count is active, it records exactly that part and stops at its end.
+- **A 3-second countdown** after you press Record. The recording keeps it,
+  and the app remembers where the tutorial started, so the two line up.
+- **Sync fine-tuning.** The camera starts with a small delay that differs
+  from phone to phone, so the compare screen has a "Sync" panel to nudge
+  your video by ±1 frame or ±0.1 s. The nudge is saved with the take.
+- **The recorded file is not mirrored** (it's how others see you). The
+  compare screen shows it **mirrored by default**, like a mirror, and you
+  can switch that off.
+- **The AI compares what you see on screen.** If you look the same as the
+  tutorial on screen (with the current mirror settings), it counts as a
+  match. So the mirror toggles affect the analysis, and the app tells you
+  when you should re-analyze.
+- **In group videos the AI follows the biggest (closest) dancer** in each
+  frame. Choosing a specific dancer is in Next steps.
+- **Timing sign:** "late" means you do the move after the tutorial does.
+  Detection works in steps of 0.1 s, within ±0.6 s.
+- **The latest analysis is saved with each take.** Re-analyzing replaces it.
+- **Takes are not part of the notes export** (they're videos). Deleting a
+  project or a take always asks first, and deletes the video files too.
 
-Everything stays on your iPhone: no accounts, no servers, no analytics.
+**Liquid Glass (iOS 26 / 27)**
+- **Liquid Glass on iOS 26+, solid look on iOS 17–25.** The deployment
+  target stays iOS 17. The glass code is guarded twice: compiled only with
+  Xcode 26+ (`#if compiler(>=6.2)`), and used only on iOS 26+ (`#available`).
+- **Glass parts:** all big buttons, the 8-count loop/edit buttons, and the
+  control bars that float over video. Navigation bars, toolbars, sheets and
+  menus get glass automatically from iOS.
+- **Built on the iOS 26 APIs** (`glassEffect`, `GlassEffectContainer`), which
+  iOS 27 still uses. Reportedly, iOS 27 makes the glass less transparent and
+  adds a user setting for it. Both would apply to this app automatically.
+  Also reportedly, Xcode 27 no longer lets apps opt out of Liquid Glass; this
+  app doesn't try to. These iOS 27 details come from secondary sources
+  ([Wikipedia](https://en.wikipedia.org/wiki/Liquid_Glass),
+  [migration write-up](https://ecorpit.com/ios-27-liquid-glass-xcode-27-migration-guide-2026/)),
+  not Apple's own docs, so I didn't use any iOS-27-only API.
+
+**Export / import** a project's notes and snapshots (not the video) as one
+  file, so you can back them up or send them to someone in your group.
+- **Record yourself** with the front camera while the tutorial plays. You see
+  yourself live next to the tutorial, or the tutorial as a see-through
+  "ghost" over your camera image. The camera records video only; the music
+  comes from the tutorial.
+- **Compare**: your take and the tutorial play in sync with the tutorial's
+  music. Turn the phone sideways for **you on the left and the tutorial on
+  the right**. In portrait it's **you on top, the tutorial below**.
+- **AI dance analysis, on your iPhone**: body tracking compares your arms,
+  legs, posture and timing with the tutorial for each 8-count. Apple
+  Intelligence then writes tips on what to work on.
+- **Liquid Glass** design on iOS 26 and newer (including iOS 27), with a
+  normal look on older iOS.
+
+Everything stays on your iPhone: no accounts, no servers, no analytics. The AI
+analysis runs on the device too.
 
 ---
 
@@ -25,6 +82,12 @@ Everything stays on your iPhone: no accounts, no servers, no analytics.
 
 You need: a Mac with Xcode installed, your iPhone, and a USB cable
 (after the first run, Wi-Fi also works).
+
+**Which Xcode?** Use the newest Xcode from the Mac App Store (Xcode 26 or
+newer). Older Xcode versions still build the app, but without two things:
+Liquid Glass, and the Apple-Intelligence-written tips. The analysis then
+falls back to built-in tips. The code switches these on automatically when
+your Xcode supports them.
 
 ### 1.1 Install Homebrew and XcodeGen (one time)
 
@@ -131,7 +194,8 @@ The Info.plist is at `EightCount/Resources/Info.plist`.
 |---|---|
 | `NSPhotoLibraryUsageDescription` | Text for a Photos-permission prompt. **You will most likely never see that prompt.** The app uses `PhotosPicker`, which runs outside the app and needs no permission. I added the key anyway as a safety net: if iOS ever does ask, the app would crash without it. |
 | `UIUserInterfaceStyle = Dark` | Always dark mode. |
-| `UISupportedInterfaceOrientations = Portrait` | Portrait only (see Decisions). |
+| `NSCameraUsageDescription` | Text shown when the app first asks to use the **camera**, for recording yourself. If you say no, you can turn it on later in Settings → EightCount. |
+| `UISupportedInterfaceOrientations` = Portrait + Landscape | Landscape is needed for the record and compare screens. All other screens stay portrait (`Services/OrientationLock.swift`). |
 | `UIRequiresFullScreen`, `UILaunchScreen` | Standard iPhone-app setup; launch screen is plain black. |
 | `ITSAppUsesNonExemptEncryption = NO` | Saves a question if you ever upload to TestFlight. |
 
@@ -142,7 +206,14 @@ Things that need **no** permission:
   even when the silent switch is on.
 - **Keeping the screen awake** while a video plays (`isIdleTimerDisabled`).
 
-The app never uses the camera, microphone, network or location.
+- **Microphone**: not used. Recordings have no sound, because the music comes
+  from the tutorial.
+- **AI analysis** (Vision body tracking and Apple's on-device model): no
+  permission or special setting is needed. Apple Intelligence must be turned
+  on in Settings → Apple Intelligence & Siri for the written tips. Otherwise
+  you get built-in tips.
+
+The app never uses the microphone, network or location.
 
 ---
 
@@ -154,7 +225,8 @@ eightcount/
 ├── README.md
 └── EightCount/
     ├── App/EightCountApp.swift         app entry, database, audio session
-    ├── Models/                         SwiftData: Project, CountNote, PoseSnapshot
+    ├── Models/                         SwiftData: Project, CountNote, PoseSnapshot, Take
+    │                                   (+ AnalysisReport, saved inside a Take)
     ├── Views/                          project list, new-project sheet,
     │                                   practice screen (ProjectDetailView), video import buttons
     ├── Playback/                       PlayerController (AVPlayer logic), video view,
@@ -162,8 +234,12 @@ eightcount/
     ├── Grid/                           CountGrid math, tap tempo, tempo sheet,
     │                                   8-count list, note editor, snapshot viewer, NoteStore
     ├── Transfer/                       export/import file format, share sheet
+    ├── Recording/                      front camera recorder, record screen
+    ├── Compare/                        synced two-video playback, compare screen, takes list
+    ├── Analysis/                       body-pose extraction (Vision), comparison,
+    │                                   coach tips (Apple Foundation Models), results screen
     ├── Services/                       VideoStorage, PhotosPicker transfer, FrameGrabber
-    ├── Design/Theme.swift              colors, big button style, time formatting
+    ├── Design/                         Theme (colors, big buttons), Glass (Liquid Glass)
     └── Resources/                      Info.plist, Assets.xcassets (icon, colors)
 ```
 
@@ -178,6 +254,34 @@ How a practice session works in the code:
    8-count.
 4. Notes (`CountNote`) are stored by **8-count number**. A snapshot is a JPEG
    saved in a `PoseSnapshot` that belongs to a note.
+
+### Record → Compare → Analyze (how to use it)
+
+1. In the practice screen, put the video where you want to start. Pick a
+   speed: practicing at 0.5× is fine, because the compare screen accounts
+   for it. Tip: set an A-B loop, or loop one 8-count, to record exactly that
+   part.
+2. Tap **⏺ (Record yourself)** at the top. Put the phone on a stand so your
+   **whole body** is visible, then tap the red button. Recording starts, a
+   3-2-1 countdown runs, then the tutorial and its music start.
+3. Tap Stop, or it stops by itself at the end of the loop or video. Then
+   tap **Compare**.
+4. In Compare, turn the phone sideways for you (left) and the tutorial
+   (right). Play, scrub, slow down, and switch to ghost overlay to see the
+   differences.
+5. If your video looks a bit early or late even though you danced on the
+   beat, use **Sync** to nudge it by a frame or 0.1 s.
+6. Tap **✨ Analyze** for the AI feedback. Tap any tip to jump to that moment.
+7. All recordings are under ⋯ → **My Takes**.
+
+How the AI analysis works: Apple's Vision framework finds 15 body points
+(shoulders, elbows, wrists, hips, knees, ankles…) in about 10 frames per
+second of both videos. The app compares joint angles, arm height, posture,
+movement size and timing for each 8-count. It gives a score per 8-count
+and lists the biggest differences ("Lift your left arm higher, 8-count 3,
+count 5"). Apple's on-device language model turns that into a few friendly
+tips. It's good at angles, levels and timing. It can't judge style,
+facial expression or energy.
 
 ---
 
@@ -271,7 +375,9 @@ Change any of them later.
 **Look & layout**
 - **Always dark** (`UIUserInterfaceStyle = Dark`), coral-pink accent, light-blue
   for anything loop-related.
-- **Portrait only** for now ("portrait first"). Landscape is in Next steps.
+- **Portrait for practice, landscape allowed for record and compare.** The
+  practice screen stays portrait-only. Turning sideways is mainly useful
+  for side by side.
 - **Buttons are at least 52 pt tall** (Apple's minimum is 44 pt) for use from a
   distance.
 - **Video takes at most about 1/3 of the screen height.** Video and controls
@@ -357,8 +463,6 @@ Change any of them later.
 
 - **Count-in before a loop restarts:** a spoken or visual "5, 6, 7, 8" right
   before the A-B / 8-count loop jumps back, so you're ready on count 1.
-- **Record yourself side by side:** record with the front camera and play it
-  next to the tutorial, synced to the same start point.
 - **Practice tracking:** a "practiced / not yet" checkmark per 8-count and a
   progress bar per project.
 
@@ -367,5 +471,8 @@ Other ideas that came up while building:
 - Open `.eightcount.json` files directly from AirDrop, Messages or Files
   ("Open in EightCount"). This needs a custom document type in Info.plist.
   Right now you import them with the ⤓ button on the project list.
-- Landscape / full-screen video mode.
+- Landscape mode for the practice screen too.
+- Pick which dancer the AI should follow in group videos.
+- Optional cloud AI (e.g. Claude) for richer, style-level feedback, if you
+  ever want it. It would need an API key and would upload frames.
 - Show a video thumbnail in the project list.
