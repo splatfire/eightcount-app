@@ -257,8 +257,15 @@ How a practice session works in the code:
    differences.
 5. If your video looks a bit early or late even though you danced on the
    beat, use **Sync** to nudge it by a frame or 0.1 s.
-6. Tap **✨ Analyze** for the AI feedback. Tap any tip to jump to that moment.
-7. All recordings are under ⋯ → **My Takes**.
+6. Tap **✨ Analyze** for the AI feedback, then **Show me on the video**. The
+   app pauses at each issue, draws a stick figure over you and over the
+   tutorial with the problem limb in red, and you step through the issues
+   with ‹ ›. **Replay** plays that moment slowly. Red dots on the timeline
+   mark every issue.
+7. Switch to **Ghost** for a one-to-one comparison. The tutorial is laid
+   see-through over you and lined up with your body automatically. Drag or
+   pinch to adjust it.
+8. All recordings are under ⋯ → **My Takes**.
 
 How the AI analysis works: Apple's Vision framework finds 15 body points
 (shoulders, elbows, wrists, hips, knees, ankles…) in about 10 frames per

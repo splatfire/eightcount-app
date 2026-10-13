@@ -58,6 +58,15 @@ User asked for (subagents must use model "sonnet" to save tokens):
 - 2026-10-13: user ran `setup-mac.sh --install` on their Mac (Xcode 27.0, free Apple ID).
   Signed, installed and RUNNING on their iPhone after trusting the developer certificate. ✅
 
+- UI cleanup round (user feedback "janky"): new Design/Components.swift (round buttons, PillPicker, cards);
+  practice controls, 8-count rows, New Project sheet, project list (thumbnails), compare + record restyled.
+- User feedback round 2: Dynamic Island overlap fixed (compare/record controls respect safe area);
+  coach mode (tap an issue → pause at that moment, skeletons over both videos with the problem limb in
+  red, caption card with ‹ › and Replay, red issue dots on the timeline, "N things to fix" button);
+  ghost mode with auto-alignment to your body (+ drag/pinch); clearer analysis results ("Show me on the
+  video", numbered Top fixes). CI green incl. UI test with ghost/coach screenshots (run 38460974176).
+- Not verifiable in CI: skeleton drawing on a real person (test video has no person).
+
 ## Next step
 - User tests on device: camera recording, real analysis, Apple Intelligence tips; report any issues.
 - Free Apple ID: re-run `./setup-mac.sh --install --no-open` every 7 days.
