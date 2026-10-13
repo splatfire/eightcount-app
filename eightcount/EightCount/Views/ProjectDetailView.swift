@@ -117,19 +117,22 @@ struct ProjectDetailView: View {
     private var practiceView: some View {
         GeometryReader { geo in
             VStack(spacing: 0) {
-                // Video: as wide as the screen, but never taller than ~1/3 of
-                // it, so the controls and the 8-count list still fit.
+                // Video: a rounded card with 16 pt side padding, never taller
+                // than ~40% of the available height, so the controls and the
+                // 8-count list still fit.
                 let aspect = max(controller.videoAspectRatio, 0.1)
-                let videoHeight = min(geo.size.width / aspect, geo.size.height * 0.34)
+                let videoWidth = max(geo.size.width - 32, 0)
+                let videoHeight = min(videoWidth / aspect, geo.size.height * 0.40)
 
                 VideoSurface(controller: controller)
-                    .frame(width: geo.size.width, height: videoHeight)
-                    .clipped()
+                    .frame(width: videoWidth, height: videoHeight)
                     .overlay {
                         // Short white flash = "snapshot taken".
                         Color.white.opacity(flash ? 0.6 : 0)
                             .allowsHitTesting(false)
                     }
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous))
+                    .padding(.top, 6)
                     .background(
                         PlayheadTracker(
                             controller: controller,
@@ -144,9 +147,9 @@ struct ProjectDetailView: View {
                     countLabel: countLabel,
                     onSnapshot: { takeSnapshot() }
                 )
-                .padding(.vertical, 8)
+                .padding(.vertical, Theme.spacingM)
 
-                Divider().overlay(Theme.surfaceRaised)
+                Divider().overlay(Theme.hairline)
 
                 CountListView(
                     project: project,

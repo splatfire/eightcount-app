@@ -1,11 +1,11 @@
 import SwiftUI
 
-/// [◀ 1 frame] [ drag strip ] [1 frame ▶]
+/// A slim ruler strip for frame-accurate fine-tuning.
 ///
-/// The strip works like a jog wheel: drag your finger sideways and the video
+/// It works like a jog wheel: drag your finger sideways and the video
 /// moves one frame for every few points of movement (right = forward), so
-/// you can land on an exact frame. The tick marks move with your finger.
-/// The frame buttons repeat while you hold them down.
+/// you can land on an exact frame. The tick marks move with the playhead.
+/// (The one-frame buttons live in the transport row of the controls.)
 @MainActor
 struct FineScrubber: View {
     let controller: PlayerController
@@ -29,34 +29,6 @@ struct FineScrubber: View {
     }
 
     var body: some View {
-        HStack(spacing: 6) {
-            Button {
-                controller.stepFrames(-1)
-            } label: {
-                Image(systemName: "backward.frame.fill")
-            }
-            .buttonStyle(.big)
-            .buttonRepeatBehavior(.enabled)
-            .frame(width: 60)
-            .accessibilityLabel("Back one frame")
-
-            strip
-
-            Button {
-                controller.stepFrames(1)
-            } label: {
-                Image(systemName: "forward.frame.fill")
-            }
-            .buttonStyle(.big)
-            .buttonRepeatBehavior(.enabled)
-            .frame(width: 60)
-            .accessibilityLabel("Forward one frame")
-        }
-    }
-
-    // MARK: - Drag strip
-
-    private var strip: some View {
         // Copy values into constants so the Canvas drawing code below
         // doesn't need to reach back into this view.
         let fps = controller.frameRate > 0 ? controller.frameRate : 30
@@ -66,56 +38,62 @@ struct FineScrubber: View {
         let majorSpacing = spacing * CGFloat(perMajor)
         // Shift the ticks with the playhead so they "follow" the finger.
         let phase = CGFloat(frameIndex * Double(spacing)).truncatingRemainder(dividingBy: majorSpacing)
-        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
         let frameText = "Frame \(Int(frameIndex.rounded()) + 1)"
-        let hint: String = isTouching ? frameText : "← drag to fine-tune →"
+        let touching = isTouching
 
-        return ZStack(alignment: .top) {
-            shape.fill(Theme.surfaceRaised)
+        return ZStack {
+            shape.fill(Color.white.opacity(0.06))
 
-            // Ruler-style tick marks hanging from the top edge.
+            // Ruler-style tick marks standing on the bottom edge.
             Canvas { context, size in
+                let baseline = size.height - 5
                 var minor = Path()
                 var major = Path()
                 var x = phase - majorSpacing
                 var i = 0
-                while x <= size.width {
+                while x <= size.width + majorSpacing {
                     if i % perMajor == 0 {
-                        major.move(to: CGPoint(x: x, y: 6))
-                        major.addLine(to: CGPoint(x: x, y: 26))
+                        major.move(to: CGPoint(x: x, y: baseline))
+                        major.addLine(to: CGPoint(x: x, y: baseline - 13))
                     } else {
-                        minor.move(to: CGPoint(x: x, y: 6))
-                        minor.addLine(to: CGPoint(x: x, y: 16))
+                        minor.move(to: CGPoint(x: x, y: baseline))
+                        minor.addLine(to: CGPoint(x: x, y: baseline - 7))
                     }
                     x += spacing
                     i += 1
                 }
-                context.stroke(minor, with: .color(.white.opacity(0.25)), lineWidth: 1)
-                context.stroke(major, with: .color(.white.opacity(0.55)), lineWidth: 1.5)
+                context.stroke(minor, with: .color(.white.opacity(0.22)), lineWidth: 1)
+                context.stroke(major, with: .color(.white.opacity(0.5)), lineWidth: 1.5)
             }
 
             // The fixed "playhead" in the middle.
-            Capsule()
-                .fill(Theme.accent)
-                .frame(width: 3, height: 30)
-                .padding(.top, 2)
-
-            // Hint / current frame number at the bottom.
             VStack {
                 Spacer(minLength: 0)
-                Text(hint)
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(isTouching ? Theme.accent : Theme.secondaryText)
-                    .lineLimit(1)
+                Capsule()
+                    .fill(Theme.accent)
+                    .frame(width: 2.5, height: 18)
                     .padding(.bottom, 4)
+            }
+
+            // Hint (idle) or current frame number (touching), at the top.
+            VStack {
+                Text(touching ? frameText : "drag to fine-tune")
+                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(touching ? Theme.accent : Color.white.opacity(0.3))
+                    .lineLimit(1)
+                    .padding(.top, 3)
+                Spacer(minLength: 0)
             }
         }
         .clipShape(shape)
         .overlay {
-            shape.stroke(isTouching ? Theme.accent : Color.clear, lineWidth: 2)
+            shape.strokeBorder(touching ? Theme.accent.opacity(0.6) : Theme.hairline, lineWidth: 1)
         }
+        .animation(.snappy(duration: 0.2), value: touching)
         .frame(maxWidth: .infinity)
-        .frame(height: Theme.tapHeight)
+        .frame(height: 32)
         .contentShape(Rectangle())
         .gesture(dragGesture)
         // VoiceOver: swipe up/down to step frames.
@@ -123,10 +101,10 @@ struct FineScrubber: View {
         .accessibilityLabel("Fine scrub")
         .accessibilityValue(frameText)
         .accessibilityAdjustableAction { direction in
-            if direction == .increment {
-                controller.stepFrames(1)
-            } else if direction == .decrement {
-                controller.stepFrames(-1)
+            switch direction {
+            case .increment: controller.stepFrames(1)
+            case .decrement: controller.stepFrames(-1)
+            @unknown default: break
             }
         }
     }

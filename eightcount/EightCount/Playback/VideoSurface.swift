@@ -39,16 +39,18 @@ struct VideoSurface: View {
         .overlay(alignment: .topTrailing) {
             if controller.isMirrored {
                 Text("MIRRORED")
-                    .font(.system(.caption2, design: .rounded).weight(.heavy))
-                    .tracking(1)
-                    .foregroundStyle(Color.black)
+                    .font(.system(.caption2, design: .rounded).weight(.semibold))
+                    .tracking(0.8)
+                    .foregroundStyle(Color.white)
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(Theme.accent))
+                    .padding(.vertical, 3)
+                    .glassSurface(Capsule(), fallback: Color.black.opacity(0.55))
                     .padding(8)
+                    .transition(.opacity)
                     .accessibilityLabel("Video is mirrored")
             }
         }
+        .animation(.snappy, value: controller.isMirrored)
         .clipped()
     }
 }
