@@ -112,18 +112,47 @@ final class EightCountUITests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
         sleep(2)
 
+        // Ghost mode (tutorial see-through over you, auto-aligned)
+        let ghost = app.buttons["Ghost"].firstMatch
+        if ghost.waitForExistence(timeout: 5) {
+            ghost.tap()
+            sleep(3)
+            shot("10b-ghost")
+            app.buttons["Side by side"].firstMatch.tap()
+            sleep(1)
+        }
+
+        // Coach mode from the saved (seeded) analysis: issue shown on the video
+        let showIssues = app.buttons["Show issues"].firstMatch
+        if showIssues.waitForExistence(timeout: 5) {
+            showIssues.tap()
+            sleep(4)
+            shot("10c-coach-1")
+            let next = app.buttons["Next issue"].firstMatch
+            if next.waitForExistence(timeout: 3) {
+                next.tap()
+                sleep(4)
+                shot("10d-coach-2")
+            }
+            let closeCoach = app.buttons["Close coach"].firstMatch
+            if closeCoach.exists { closeCoach.tap(); sleep(1) }
+        }
+
         // 8. AI analysis (the test video has no people in it, so it must end
         //    with a friendly error — the point is that nothing crashes).
         app.buttons["Analyze"].firstMatch.tap()
-        let analyze = app.buttons["Analyze my dancing"].firstMatch
-        waitFor(analyze, 10)
-        shot("11-analysis-start")
-        analyze.tap()
-        let finished = NSPredicate { _, _ in
-            app.staticTexts["That didn't work"].exists || app.buttons["Analyze again"].exists
-        }
-        expectation(for: finished, evaluatedWith: nil)
-        waitForExpectations(timeout: 240)
+        // The seeded take already has a report, so the sheet opens on the results.
+        let again = app.buttons["Analyze again"].firstMatch
+        let first = app.buttons["Analyze my dancing"].firstMatch
+        let appeared = NSPredicate { _, _ in again.exists || first.exists }
+        expectation(for: appeared, evaluatedWith: nil)
+        waitForExpectations(timeout: 15)
+        sleep(1)
+        shot("11-analysis-results")
+        (again.exists ? again : first).tap()
+        // The test video has no person in it, so a real run must end with the
+        // friendly error — the point is that nothing crashes.
+        waitFor(app.staticTexts["That didn't work"].firstMatch, 240)
         shot("12-analysis-done")
     }
 }

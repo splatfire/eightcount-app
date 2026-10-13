@@ -39,6 +39,26 @@ enum DebugSeed {
         context.insert(take)
         take.project = project
 
+        // A saved analysis with two sample issues, so the UI test can open
+        // coach mode without needing a real dancer in the video.
+        let findings = [
+            AnalysisReport.Finding(bodyPart: "Left arm", message: "Lift your left arm higher",
+                                   severity: 30, time: 2.5, eightCount: 0, beat: 5),
+            AnalysisReport.Finding(bodyPart: "Knees", message: "Bend your knees more — get lower",
+                                   severity: 20, time: 6.0, eightCount: 1, beat: 2)
+        ]
+        take.analysisReport = AnalysisReport(
+            createdAt: .now, overallScore: 74, timingOffset: 0.12, poseCoverage: 0.9,
+            segments: [
+                .init(index: 0, isEightCount: true, start: 1, end: 4.5, score: 70,
+                      timingOffset: 0.1, findings: [findings[0]]),
+                .init(index: 1, isEightCount: true, start: 4.5, end: 8.5, score: 78,
+                      timingOffset: 0.14, findings: [findings[1]])
+            ],
+            topFindings: findings,
+            coachText: "• Lift your left arm higher on count 5.\n• Bend your knees more.",
+            coachSource: "Built-in tips", tutorialMirrored: false, takeMirrored: true)
+
         try? context.save()
     }
 }
