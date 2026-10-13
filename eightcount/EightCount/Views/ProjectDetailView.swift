@@ -122,7 +122,7 @@ struct ProjectDetailView: View {
                 // 8-count list still fit.
                 let aspect = max(controller.videoAspectRatio, 0.1)
                 let videoWidth = max(geo.size.width - 32, 0)
-                let videoHeight = min(videoWidth / aspect, geo.size.height * 0.40)
+                let videoHeight = min(videoWidth / aspect, geo.size.height * 0.34)
 
                 VideoSurface(controller: controller)
                     .frame(width: videoWidth, height: videoHeight)

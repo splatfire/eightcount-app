@@ -138,11 +138,11 @@ extension View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous)
-                    .fill(highlighted ? Theme.highlight : Theme.surface)
+                    .fill(highlighted ? Theme.accent.opacity(0.12) : Theme.surface)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous)
-                    .strokeBorder(highlighted ? Theme.accent.opacity(0.7) : Theme.hairline, lineWidth: 1)
+                    .strokeBorder(highlighted ? Theme.accent.opacity(0.45) : Theme.hairline, lineWidth: 1)
             )
     }
 }

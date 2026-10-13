@@ -36,31 +36,30 @@ struct CountRowView: View {
         self.onEdit = onEdit
     }
 
-    /// Height of the two stacked round buttons (also the row's minimum content height).
+    /// Size of the round loop / edit buttons (side by side, so rows stay compact).
     private static let buttonSize: CGFloat = 44
-    private static let buttonsHeight: CGFloat = buttonSize * 2 + 10
 
     var body: some View {
-        HStack(alignment: .top, spacing: Theme.spacingM) {
+        HStack(alignment: .center, spacing: Theme.spacingS) {
             // The whole left part is one big button: tap = jump here.
             Button(action: onJump) {
                 HStack(alignment: .top, spacing: Theme.spacingM) {
                     numberColumn
                     details
                 }
-                .frame(maxWidth: .infinity, minHeight: Self.buttonsHeight, alignment: .topLeading)
+                .frame(maxWidth: .infinity, minHeight: Self.buttonSize, alignment: .topLeading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityHint("Jumps the video to this 8-count")
 
             // Separate buttons, so they never trigger the jump.
-            VStack(spacing: 10) {
+            HStack(spacing: Theme.spacingS) {
                 loopButton
                 editButton
             }
         }
-        .card(highlighted: isCurrent)
+        .card(padding: 10, highlighted: isCurrent)
         .overlay(
             // A quiet outline marks the looped 8-count (the current one has its own highlight).
             RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous)
