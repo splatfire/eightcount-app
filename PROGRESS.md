@@ -24,7 +24,7 @@ User asked for (subagents must use model "sonnet" to save tokens):
 
 - [x] Foundation (me): Take model, AnalysisReport, TakeTiming, TakeStore, OrientationLock, Glass styling, Info.plist camera key
 - [ ] Recording (sonnet agent): Recording/
-- [ ] Compare (sonnet agent): Compare/
+- [x] Compare (sonnet agent): Compare/ (SyncedPlayback, CompareView, TakesListView)
 - [ ] Analysis (sonnet agent): Analysis/
 - [x] Integration in ProjectDetailView (record button, My Takes, compare cover)
 - [ ] Review (sonnet agent), README update
