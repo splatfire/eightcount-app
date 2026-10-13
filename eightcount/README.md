@@ -339,6 +339,49 @@ build. Here is where to look first:
    with a Play/Pause bar, so you can tap along while the music plays.
 10. **Silent switch:** music should still play with the switch on silent.
 
+**D. Record / compare / AI analysis (added in the second round)**
+
+Build errors, if any, are most likely here:
+
+1. `ForEach(projects)` / `NavigationLink(value: project)` need the SwiftData
+   models to be `Identifiable`. If Xcode complains, use
+   `ForEach(projects, id: \.persistentModelID)`.
+2. `RecordView`'s `.sensoryFeedback(trigger:) { old, new in … }`. If the
+   closure's type can't be worked out, write `-> SensoryFeedback?` after
+   `old, new in`.
+3. `CameraRecorder` observes `videoRotationAngleForHorizonLevelPreview` on
+   `AVCaptureDevice.RotationCoordinator`. If the key path is rejected, react
+   to `UIDevice.orientationDidChangeNotification` instead.
+4. `Analysis/PoseExtractor.swift`: `for try await result in
+   generator.images(for:)` and the Vision calls. A warning about an
+   unnecessary `try` is harmless.
+5. `Analysis/CoachWriter.swift` (Foundation Models): `LanguageModelSession`,
+   `respond(to:)`, `SystemLanguageModel.default.availability`. This part is
+   only compiled with Xcode 26+.
+6. Deprecation warnings for Vision's `VN…` classes on new SDKs are fine
+   (yellow, not red).
+
+Test these on the phone:
+
+1. **Recording upright in landscape:** record once in portrait and once
+   sideways. Both should be upright in the compare screen.
+2. **Sync:** clap on count 1 while recording, then compare. If you're a few
+   frames off, use Sync to nudge. The phone's camera start delay isn't
+   exactly known, so this is expected.
+3. **Music while recording:** the tutorial's sound plays from the speaker
+   and the recording has no sound.
+4. **After recording, "Compare" opens the compare screen.** If it ever
+   doesn't open, tell me and I'll add a short delay.
+5. **Analysis:** try a short part (one or two 8-counts) first. It takes
+   roughly 1–2 minutes per minute of video. Check that "late" or "early"
+   matches what you see, and that left/right in the tips matches your own
+   left/right.
+6. **Apple Intelligence tips:** the caption should say "Tips by Apple
+   Intelligence". If it says "Built-in tips", turn on Apple Intelligence in
+   Settings, or wait until its model has finished downloading.
+7. **Liquid Glass:** buttons and control bars should look like glass on
+   iOS 26/27.
+
 **C. Things I knowingly left simple**
 
 - `@State private var controller = PlayerController()`: SwiftUI may create

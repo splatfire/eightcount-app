@@ -28,7 +28,7 @@ struct ProjectDetailView: View {
     // Recording yourself and comparing (see Recording/ and Compare/).
     @State private var showRecord = false
     @State private var showTakes = false
-    @State private var comparing: Take?
+    @State private var comparing: CompareTarget?
     /// Actions to run once a sheet/cover has finished closing (SwiftUI can't
     /// open a new full-screen cover while another one is still closing).
     @State private var pendingCompare: Take?
@@ -88,8 +88,8 @@ struct ProjectDetailView: View {
         .fullScreenCover(isPresented: $showRecord, onDismiss: runPendingActions) {
             recordView
         }
-        .fullScreenCover(item: $comparing) { take in
-            CompareView(project: project, take: take, tutorialMirrored: controller.isMirrored)
+        .fullScreenCover(item: $comparing) { target in
+            CompareView(project: project, take: target.take, tutorialMirrored: controller.isMirrored)
         }
         .confirmationDialog(
             "Replace the video?",
@@ -320,7 +320,7 @@ struct ProjectDetailView: View {
     private func runPendingActions() {
         if let take = pendingCompare {
             pendingCompare = nil
-            comparing = take
+            comparing = CompareTarget(take: take)
         } else if pendingRecord {
             pendingRecord = false
             startRecording()
@@ -386,6 +386,13 @@ struct ProjectDetailView: View {
         try? modelContext.save()
         if oldName != stored { VideoStorage.deleteVideo(named: oldName) }
     }
+}
+
+/// Wraps a take so `.fullScreenCover(item:)` has something `Identifiable`
+/// without relying on how SwiftData models conform to `Identifiable`.
+private struct CompareTarget: Identifiable {
+    let take: Take
+    var id: PersistentIdentifier { take.persistentModelID }
 }
 
 /// Identifies which 8-count the note editor is open for.

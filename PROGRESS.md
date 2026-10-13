@@ -1,3 +1,5 @@
+STATUS: DONE
+
 # EightCount (iOS dance-practice app) — progress
 
 App lives in `eightcount/`. Generate the Xcode project with `xcodegen generate` in that folder
@@ -15,7 +17,7 @@ App lives in `eightcount/`. Generate the Xcode project with `xcodegen generate` 
 - [x] Independent review pass of the whole codebase; fixes applied
 - [x] README: setup on Mac, free vs paid account, permissions, Check on Mac, Decisions, Next steps
 
-## Session 2 scope (in progress)
+## Session 2 scope (done)
 User asked for (subagents must use model "sonnet" to save tokens):
 1. Record yourself (front camera, no mic) while the tutorial plays; live side-by-side or ghost overlay.
 2. Compare screen: landscape = you LEFT / tutorial RIGHT, portrait = you TOP / tutorial BOTTOM; synced, audio from tutorial.
@@ -27,11 +29,12 @@ User asked for (subagents must use model "sonnet" to save tokens):
 - [x] Compare (sonnet agent): Compare/ (SyncedPlayback, CompareView, TakesListView)
 - [x] Analysis (sonnet agent): Analysis/ (PoseExtractor, PoseComparer, CoachWriter, AnalysisView)
 - [x] Integration in ProjectDetailView (record button, My Takes, compare cover)
-- [ ] Review (sonnet agent), README update
+- [x] Review (sonnet agent) + README update (features, permissions, decisions, Check on Mac D)
 
 ## Next step
 - On the Mac: `cd eightcount && xcodegen generate && open EightCount.xcodeproj`, build, and fix any
   first-build errors (see README → "Check on Mac").
+- Then test record → compare → analyze on the iPhone (README → Check on Mac, section D).
 - Then the nice-to-haves in README → "Next steps".
 
 ## Open problems
