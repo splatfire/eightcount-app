@@ -66,6 +66,27 @@ jobs:
           echo "=== WARNINGS (first 80) ==="
           grep -E "warning:" build.log | sort -u | head -80 || true
 
+  # Runs eightcount/setup-mac.sh like on your Mac (minus the iPhone part,
+  # which needs your Apple ID and a cable).
+  setup-script:
+    name: setup-mac.sh (Xcode 27)
+    runs-on: xcode-27
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: eightcount
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run setup script (generate + compile check)
+        run: ./setup-mac.sh --no-open
+      - name: Install mode without Apple ID must stop with a clear message
+        run: |
+          set +e
+          ./setup-mac.sh --install --no-open > install.log 2>&1
+          code=$?
+          cat install.log | tail -15
+          test $code -ne 0 && grep -qE "No Apple Team found|No iPhone found" install.log
+
   # Runtime test: a UI test taps through the app in an iOS Simulator with a
   # generated test video (practice, loop, notes, takes, compare, analysis).
   # Screenshots: Actions run → Artifacts → ui-screenshots.

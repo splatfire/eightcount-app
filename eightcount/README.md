@@ -70,15 +70,22 @@ cd splatfire/eightcount
 
 (Already cloned? Run `git pull` inside the `splatfire` folder instead.)
 
-**Shortcut:** `./setup-mac.sh` does steps 1.1 (XcodeGen part) and 1.3 for
-you. It checks Xcode, installs XcodeGen, generates the project, runs a quick
-compile check, and opens Xcode. Optionally, it also saves your Team ID and
-bundle ID:
+**Shortcut (recommended):** with your iPhone connected by cable and unlocked:
 
 ```sh
-./setup-mac.sh                                   # just generate + open
-./setup-mac.sh ABCDE12345 com.yourname.eightcount  # + your Team ID and bundle ID
+./setup-mac.sh --install
 ```
+
+It checks Xcode, installs XcodeGen, generates the project and runs a compile
+check. It then finds your Apple Team, builds and signs the app, and installs
+and launches it on your iPhone. If something is missing that only you can
+do, such as signing in to Xcode, tapping "Trust" or turning on Developer
+Mode, it stops and tells you exactly what to do. After you've done it, run
+it again.
+
+Other options: `./setup-mac.sh` (generate and open Xcode only),
+`--bundle-id com.yourname.eightcount` (if the default ID is taken),
+`--team ABCDE12345`, `--no-open`.
 
 The code is also compiled automatically on GitHub's Macs, with Xcode 27 and
 Xcode 26, after every change ("EightCount iOS build" under the repo's

@@ -4,3 +4,5 @@ build.log
 xcuserdata/
 DerivedData/
 .DS_Store
+build/
+device-build.log
