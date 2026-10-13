@@ -12,6 +12,11 @@ on:
       - ".github/workflows/eightcount-ios-build.yml"
   workflow_dispatch:
 
+# A newer push cancels the build of an older one.
+concurrency:
+  group: eightcount-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     strategy:
@@ -60,3 +65,71 @@ jobs:
           grep -E "error:" build.log | sort -u || true
           echo "=== WARNINGS (first 80) ==="
           grep -E "warning:" build.log | sort -u | head -80 || true
+
+  # Runtime smoke test: launch the app in an iOS Simulator, make sure it
+  # doesn't crash, and keep a screenshot (Actions run → Artifacts).
+  smoke:
+    name: Launch in Simulator (Xcode 27)
+    runs-on: xcode-27
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: eightcount
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen and generate project
+        run: (command -v xcodegen || brew install xcodegen) && xcodegen generate
+
+      - name: Pick and boot an iPhone simulator
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          d = json.load(sys.stdin)["devices"]
+          runtimes = sorted((r for r in d if "iOS" in r), reverse=True)
+          for r in runtimes:
+              for dev in d[r]:
+                  if dev["name"].startswith("iPhone"):
+                      print(dev["udid"]); sys.exit(0)
+          sys.exit(1)')
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl list devices | grep "$UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+
+      - name: Build for the simulator
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project EightCount.xcodeproj -scheme EightCount -configuration Debug \
+            -destination "id=$UDID" -derivedDataPath build/sim \
+            2>&1 | tee sim-build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
+          test -d build/sim/Build/Products/Debug-iphonesimulator/EightCount.app
+
+      - name: Install, launch and check for crashes
+        run: |
+          APP=build/sim/Build/Products/Debug-iphonesimulator/EightCount.app
+          xcrun simctl install "$UDID" "$APP"
+          OUT=$(xcrun simctl launch "$UDID" io.github.splatfire.eightcount)
+          echo "$OUT"
+          PID=$(echo "$OUT" | awk -F': ' '{print $2}')
+          sleep 12
+          xcrun simctl io "$UDID" screenshot launch.png
+          if ps -p "$PID" > /dev/null; then
+            echo "App is still running after 12 s: no launch crash."
+          else
+            echo "App is NOT running — it crashed. Recent crash reports:"
+            ls -t ~/Library/Logs/DiagnosticReports/ | grep -i eightcount | head -3 || true
+            for f in $(ls -t ~/Library/Logs/DiagnosticReports/ | grep -i eightcount | head -1); do
+              head -120 ~/Library/Logs/DiagnosticReports/"$f"
+            done
+            exit 1
+          fi
+
+      - name: Save screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulator-screenshot
+          path: eightcount/launch.png
+          if-no-files-found: ignore
