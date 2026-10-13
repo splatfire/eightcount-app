@@ -198,7 +198,101 @@ paste the error message and the file name into a chat with Claude.
 
 ## 6. Decisions I made
 
-<!-- DECISIONS -->
+You said you couldn't answer questions live, so I made these calls myself.
+Change any of them later.
+
+**Project & tooling**
+- **App name "EightCount"**, bundle ID `io.github.splatfire.eightcount`. Change it
+  in `project.yml` if Xcode can't register it (see 1.3).
+- **App folder `eightcount/`** inside this repo, next to the existing web
+  apps. Root `README.md` links to it.
+- **No third-party packages at all.** Everything uses Apple frameworks.
+- **Swift 5 language mode** (`SWIFT_VERSION: 5.0`), so Swift 6's stricter
+  concurrency checks show up as warnings, not build errors, on a first build.
+- **Hand-written `Info.plist`** (not Xcode's generated one), so you can read
+  every entry in one file.
+- **Simple generated app icon**: eight beat dots in a circle, the first one
+  highlighted, plus a play triangle.
+
+**Look & layout**
+- **Always dark** (`UIUserInterfaceStyle = Dark`), coral-pink accent, light-blue
+  for anything loop-related.
+- **Portrait only** for now ("portrait first"). Landscape is in Next steps.
+- **Buttons are at least 52 pt tall** (Apple's minimum is 44 pt) for use from a
+  distance.
+- **Video takes at most about 1/3 of the screen height.** Video and controls
+  stay fixed at the top, and only the 8-count list scrolls.
+- **The 8-count list auto-scrolls to the current 8-count only while the
+  video plays**, so you can scroll freely while paused. You can turn this off
+  under ⋯ → "Follow Playback in List".
+
+**Video & playback**
+- **Videos are copied** into the app's private folder (Application
+  Support/Videos), under a random file name. They're included in your
+  normal iPhone backup.
+- **A project can exist without a video.** You can add one later, or replace
+  it (with a confirmation). Notes stay attached to their 8-count numbers.
+- **Picking a video in the New Project sheet and then pressing Cancel deletes
+  the copy**, so nothing is left behind.
+- **Sound plays even with the silent switch on**, using the "playback" audio
+  session. This also pauses music from other apps.
+- **Pitch correction uses Apple's `.spectral` algorithm**, the highest-quality
+  one.
+- **Speed is one of four buttons** (0.25×, 0.5×, 0.75×, 1×), no free slider.
+  The speed stays when you loop or jump.
+- **Scrubbing precision comes in three layers**: the normal timeline slider,
+  a "fine-scrub" strip (drag about 7 pt = 1 frame), and ◀︎/▶︎ one-frame buttons
+  (hold to repeat). Frame length comes from the video's frame rate.
+- **−2 s / +2 s buttons** for quick "again from a bit before" jumps.
+- **A-B loop:** "Set A" and "Set B" save the current time. If B ends up
+  before A they are swapped. The loop turns on automatically once both are
+  set.
+- **Looping an 8-count reuses the A-B loop** (A = start, B = end of that
+  8-count), so the loop buttons show it too.
+- **Jumping (tap a row, slider, ±2 s) outside the current loop turns the
+  loop off** but keeps A and B, so one tap on "Loop" brings it back.
+  Frame-stepping never turns it off.
+- **The screen stays awake only while the video is actually playing.**
+- **The video pauses when you leave the practice screen.**
+
+**8-count grid & notes**
+- **Notes are stored per 8-count number, not per video time.** If you later
+  change the BPM or the start of count 1, the notes stay on "8-count #5"
+  even though #5 now covers a slightly different part of the video. I chose
+  this because you usually fine-tune the tempo first and then write notes.
+- **Tap tempo corrects for slow speed.** If you tap along at 0.5× speed,
+  the BPM is doubled back to the song's real tempo. It averages your last 8
+  taps, and a pause of about 2 s starts over.
+- **BPM range 40–250, one decimal place.** −1 / −0.5 / +0.5 / +1 buttons
+  for fine adjustments.
+- **"Count 1 starts NOW"** uses the current video position. Nudge buttons
+  move it by ±0.01 s or ±0.05 s.
+- **Anything before count 1 shows as "Intro"** in the count display.
+- **A partial 8-count at the end of the video still gets a row.**
+- **Empty notes are cleaned up.** Opening an 8-count's editor and closing it
+  without typing anything doesn't leave an empty note behind.
+- **Snapshots go to the 8-count at the playhead.** During the intro they go
+  to 8-count 1. Snapshots need a BPM, so the app tells you to set one first.
+- **A snapshot is saved as you see it.** If mirror mode is on, the picture is
+  mirrored too. It's a JPEG, at most 1280 px on its longest side, stored in
+  the database with SwiftData's "external storage".
+- **Deleting anything always asks first**: projects, snapshots, and the
+  current video when you replace it.
+
+**Export / import**
+- **The file format is a single `.json` file** (named
+  `Title - section.eightcount.json`) with the snapshots embedded. iOS has no
+  built-in zip API, and a plain JSON file needs no special file-type setup.
+  The video is never included.
+- **Importing always creates a new project.** It never overwrites an existing
+  one. If the name already exists, " (imported)" is added. The imported
+  project has no video and shows the original video's file name, so you know
+  what to add.
+- **Import is a button** (⤓ at the top left of the project list), not "Open
+  in EightCount" from AirDrop or Files. That would need extra file-type setup
+  (see Next steps).
+- **Files from a newer app version, or that aren't EightCount files, are
+  rejected** with a clear message.
 
 ---
 
