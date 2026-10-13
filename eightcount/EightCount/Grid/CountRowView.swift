@@ -36,61 +36,57 @@ struct CountRowView: View {
         self.onEdit = onEdit
     }
 
+    /// Height of the two stacked round buttons (also the row's minimum content height).
+    private static let buttonSize: CGFloat = 44
+    private static let buttonsHeight: CGFloat = buttonSize * 2 + 10
+
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: Theme.spacingM) {
             // The whole left part is one big button: tap = jump here.
             Button(action: onJump) {
-                HStack(alignment: .top, spacing: 12) {
+                HStack(alignment: .top, spacing: Theme.spacingM) {
                     numberColumn
                     details
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: Self.buttonsHeight, alignment: .topLeading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityHint("Jumps the video to this 8-count")
 
             // Separate buttons, so they never trigger the jump.
-            VStack(spacing: 8) {
+            VStack(spacing: 10) {
                 loopButton
                 editButton
             }
         }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(isCurrent ? Theme.highlight : Theme.surface)
-        )
+        .card(highlighted: isCurrent)
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(borderColor, lineWidth: 2)
+            // A quiet outline marks the looped 8-count (the current one has its own highlight).
+            RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous)
+                .strokeBorder(Theme.loopColor.opacity(0.45), lineWidth: 1)
+                .opacity(isLooped && !isCurrent ? 1 : 0)
         )
         .animation(.easeInOut(duration: 0.2), value: isCurrent)
         .animation(.easeInOut(duration: 0.2), value: isLooped)
     }
 
-    private var borderColor: Color {
-        if isCurrent { return Theme.accent }
-        if isLooped { return Theme.loopColor.opacity(0.7) }
-        return Color.clear
-    }
-
     // MARK: - Left side
 
     private var numberColumn: some View {
-        VStack(spacing: 2) {
+        VStack(alignment: .leading, spacing: 2) {
             Text("\(index + 1)")
-                .font(.system(size: 34, weight: .heavy, design: .rounded).monospacedDigit())
+                .font(.system(.title2, design: .rounded).weight(.semibold).monospacedDigit())
                 .foregroundStyle(isCurrent ? Theme.accent : Color.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
             Text(formatTime(startTime))
-                .font(.caption.monospacedDigit())
+                .font(.caption2.monospacedDigit())
                 .foregroundStyle(Theme.secondaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
-        .frame(width: 64)
+        .frame(width: 52, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("8-count \(index + 1), starts at \(formatTime(startTime))")
     }
@@ -99,14 +95,14 @@ struct CountRowView: View {
         VStack(alignment: .leading, spacing: 8) {
             let mainText = (note?.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             if mainText.isEmpty {
-                Text("Tap ✎ to add notes")
-                    .font(.subheadline)
+                Text("Add moves…")
+                    .font(.subheadline.italic())
                     .foregroundStyle(Theme.secondaryText)
             } else {
                 Text(mainText)
-                    .font(.body)
+                    .font(.subheadline)
                     .foregroundStyle(Color.white)
-                    .lineLimit(3)
+                    .lineLimit(2)
                     .multilineTextAlignment(.leading)
             }
 
@@ -123,7 +119,7 @@ struct CountRowView: View {
                 thumbnailStrip(note.sortedSnapshots)
             }
         }
-        .padding(.top, 4)
+        .padding(.top, 3)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -155,13 +151,14 @@ struct CountRowView: View {
         HStack(spacing: 4) {
             Image(systemName: chip.icon)
                 .font(.caption2)
+                .foregroundStyle(chip.isLyric ? Theme.loopColor : Theme.secondaryText)
             Text(chip.text)
                 .font(.caption)
                 .italic(chip.isLyric)
                 .lineLimit(1)
         }
-        .foregroundStyle(chip.isLyric ? Theme.loopColor : Color.white.opacity(0.9))
-        .padding(.horizontal, 8)
+        .foregroundStyle(Color.white.opacity(0.88))
+        .padding(.horizontal, 9)
         .padding(.vertical, 4)
         .background(Capsule().fill(Theme.surfaceRaised))
     }
@@ -173,13 +170,13 @@ struct CountRowView: View {
         let extra = snapshots.count - shown.count
         return HStack(spacing: 6) {
             ForEach(shown) { snapshot in
-                SnapshotThumbnailView(snapshot: snapshot, width: 44, height: 56)
+                SnapshotThumbnailView(snapshot: snapshot, width: 40, height: 52)
             }
             if extra > 0 {
                 Text("+\(extra)")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.secondaryText)
-                    .frame(width: 44, height: 56)
+                    .frame(width: 40, height: 52)
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .fill(Theme.surfaceRaised)
@@ -195,14 +192,8 @@ struct CountRowView: View {
     private var loopButton: some View {
         Button(action: onToggleLoop) {
             Image(systemName: "repeat")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(isLooped && !Theme.usesGlass ? Color.black : Color.white)
-                .frame(width: 48, height: 48)
-                .glassSurface(RoundedRectangle(cornerRadius: 12, style: .continuous),
-                              tint: isLooped ? Theme.loopColor : nil, interactive: true)
-                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.round(size: Self.buttonSize, isOn: isLooped, tint: Theme.loopColor))
         .accessibilityLabel(loopButtonLabel)
     }
 
@@ -213,13 +204,8 @@ struct CountRowView: View {
     private var editButton: some View {
         Button(action: onEdit) {
             Image(systemName: "pencil")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(Color.white)
-                .frame(width: 48, height: 48)
-                .glassSurface(RoundedRectangle(cornerRadius: 12, style: .continuous), interactive: true)
-                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.round(size: Self.buttonSize))
         .accessibilityLabel("Edit notes for 8-count \(index + 1)")
     }
 }

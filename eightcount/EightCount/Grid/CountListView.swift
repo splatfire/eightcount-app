@@ -41,14 +41,15 @@ struct CountListView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 10) {
-                    tempoChip
+                    if grid.bpm > 0 {
+                        tempoChip
+                    }
                     rows(notesByIndex)
                 }
-                .padding(.horizontal, 12)
-                .padding(.top, 10)
-                .padding(.bottom, 24)
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 28)
             }
-            .background(Theme.background)
             .onChange(of: currentIndex) { _, newIndex in
                 guard followPlayback, let newIndex else { return }
                 scroll(proxy, to: newIndex)
@@ -57,40 +58,48 @@ struct CountListView: View {
                 guard isOn, let index = currentIndex else { return }
                 scroll(proxy, to: index)
             }
+            // A soft fade at the top, so rows slide away under the controls
+            // instead of being cut off.
+            .mask { topFade }
+            .background(Theme.background)
+        }
+    }
+
+    private var topFade: some View {
+        VStack(spacing: 0) {
+            LinearGradient(colors: [Color.black.opacity(0), Color.black],
+                           startPoint: .top, endPoint: .bottom)
+                .frame(height: 12)
+            Rectangle().fill(Color.black)
         }
     }
 
     // MARK: - Pieces
 
-    /// "♩ 120 BPM · count 1 at 0:03.20   Edit ›" — tap to open the tempo sheet.
+    /// "♩ 120 BPM · count 1 at 0:00.50   Edit" — tap to open the tempo sheet.
+    /// (Without a tempo the empty state below offers "Set Tempo" instead.)
     private var tempoChip: some View {
-        Button(action: onSetupTempo) {
-            HStack(spacing: 8) {
-                if grid.bpm > 0 {
+        HStack(spacing: 0) {
+            Button(action: onSetupTempo) {
+                HStack(spacing: 10) {
                     Text("♩ \(TempoTapper.displayString(for: grid.bpm)) BPM · count 1 at \(formatTime(grid.offset))")
                         .foregroundStyle(Color.white)
-                } else {
-                    Text("♩ Tempo not set")
-                        .foregroundStyle(Theme.secondaryText)
+                    Text("Edit")
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.accent)
                 }
-                Spacer(minLength: 8)
-                Text(grid.bpm > 0 ? "Edit" : "Set")
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Theme.accent)
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(Theme.accent)
+                .font(.subheadline.weight(.medium).monospacedDigit())
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .padding(.horizontal, 16)
+                .frame(minHeight: Theme.controlHeight)
+                .glassSurface(Capsule(), interactive: true, fallback: Theme.surface)
+                .contentShape(Capsule())
             }
-            .font(.subheadline.weight(.medium).monospacedDigit())
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-            .padding(.horizontal, 16)
-            .frame(maxWidth: .infinity, minHeight: 48)
-            .background(Capsule().fill(Theme.surface))
-            .contentShape(Capsule())
+            .buttonStyle(.plain)
+            .accessibilityLabel(tempoAccessibilityText)
+            Spacer(minLength: 0)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(tempoAccessibilityText)
     }
 
     private var tempoAccessibilityText: String {
@@ -121,39 +130,45 @@ struct CountListView: View {
         } else if grid.isValid {
             // BPM is set but count 1 is at/after the end of the video.
             messageState(
+                icon: "backward.end.fill",
                 title: "Count 1 is after the end",
                 message: "Count 1 is set to \(formatTime(grid.offset)), but the video is only \(formatTime(grid.duration)) long. Move the start of count 1 earlier.",
                 buttonTitle: "Fix Start of Count 1"
             )
         } else {
             messageState(
-                title: "No 8-counts yet",
-                message: "Set the song's BPM (or tap along) to split the video into 8-counts.",
+                icon: "music.quarternote.3",
+                title: "Find the beat",
+                message: "Set the song's tempo, or tap along, to split the video into 8-counts.",
                 buttonTitle: "Set Tempo"
             )
         }
     }
 
-    private func messageState(title: String, message: String, buttonTitle: String) -> some View {
-        VStack(spacing: 16) {
-            Image(systemName: "metronome")
-                .font(.system(size: 44))
+    /// Calm, centered empty state: soft icon circle, short text, one button.
+    private func messageState(icon: String, title: String, message: String, buttonTitle: String) -> some View {
+        VStack(spacing: Theme.spacingM) {
+            Image(systemName: icon)
+                .font(.system(size: 28, weight: .regular))
                 .foregroundStyle(Theme.accent)
+                .frame(width: 72, height: 72)
+                .background(Circle().fill(Theme.accent.opacity(0.14)))
+                .padding(.bottom, 4)
             Text(title)
-                .font(.title3.weight(.bold))
+                .font(.title3.weight(.semibold))
             Text(message)
-                .font(.body)
+                .font(.subheadline)
                 .foregroundStyle(Theme.secondaryText)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             Button(action: onSetupTempo) {
-                Label(buttonTitle, systemImage: "metronome")
+                Text(buttonTitle)
             }
-            .buttonStyle(.big(isOn: true))
-            .padding(.horizontal, 24)
+            .buttonStyle(AccentCapsuleButtonStyle())
+            .padding(.top, Theme.spacingS)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 32)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 28)
         .frame(maxWidth: .infinity)
     }
 
