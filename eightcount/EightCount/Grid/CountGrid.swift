@@ -1,0 +1,56 @@
+import Foundation
+
+/// Pure math that splits a video into 8-counts.
+///
+///     offset          offset + 1 × eightCountDuration
+///     |-- 8-count 1 --|-- 8-count 2 --|-- ...
+///
+/// Indexes are 0-based in code and shown 1-based on screen.
+struct CountGrid: Equatable {
+    var bpm: Double
+    /// Video time (seconds) where count 1 of the first 8-count starts.
+    var offset: Double
+    /// Video length in seconds.
+    var duration: Double
+
+    /// False until a BPM has been set (and the video length is known).
+    var isValid: Bool { bpm > 0 && duration > 0 && bpm.isFinite }
+
+    /// Length of one beat ("one count") in seconds.
+    var beatDuration: Double { 60.0 / bpm }
+
+    /// Length of one 8-count in seconds.
+    var eightCountDuration: Double { beatDuration * 8 }
+
+    /// How many 8-counts fit between `offset` and the end of the video.
+    /// A partial 8-count at the end still counts.
+    var numberOfEightCounts: Int {
+        guard isValid, offset < duration else { return 0 }
+        // Tiny epsilon so floating-point noise doesn't add an empty 8-count.
+        return Int(ceil((duration - offset) / eightCountDuration - 1e-9))
+    }
+
+    /// Start time of 8-count `index`.
+    func start(of index: Int) -> Double {
+        offset + Double(index) * eightCountDuration
+    }
+
+    /// End time of 8-count `index` (clamped to the video length).
+    func end(of index: Int) -> Double {
+        min(start(of: index + 1), duration)
+    }
+
+    /// The 8-count playing at `time`, or nil before count 1 / without BPM.
+    func index(at time: Double) -> Int? {
+        guard isValid, time >= offset else { return nil }
+        let i = Int(floor((time - offset) / eightCountDuration))
+        return i < numberOfEightCounts ? i : max(numberOfEightCounts - 1, 0)
+    }
+
+    /// The count (1...8) within its 8-count at `time`, or nil before count 1.
+    func beat(at time: Double) -> Int? {
+        guard isValid, time >= offset else { return nil }
+        let intoEight = (time - offset).truncatingRemainder(dividingBy: eightCountDuration)
+        return min(Int(floor(intoEight / beatDuration)) + 1, 8)
+    }
+}
