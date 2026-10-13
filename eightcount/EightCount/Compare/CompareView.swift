@@ -1,4 +1,5 @@
 import AVFoundation
+import QuartzCore
 import SwiftData
 import SwiftUI
 import UIKit
@@ -8,7 +9,14 @@ import UIKit
 ///
 ///  - Landscape: YOU on the left, TUTORIAL on the right.
 ///  - Portrait:  YOU on top, TUTORIAL at the bottom.
-///  - "Overlay" mode: the tutorial is a see-through ghost over you.
+///  - "Ghost" mode: the tutorial is a see-through ghost over you, auto-aligned
+///    to your body (drag / pinch to fine-tune).
+///  - "Coach" mode: AI issues are drawn right on the video frames (skeletons
+///    with the problem joints in red) and a small card explains each one.
+///
+/// Safe area: the VIDEOS are full-bleed (they ignore the safe area), but every
+/// control lives in a layer that respects it, so nothing hides under the
+/// Dynamic Island, the notch or the home indicator.
 ///
 /// Present it with `.fullScreenCover`. It has its own close button.
 @MainActor
@@ -28,8 +36,8 @@ struct CompareView: View {
     /// (The recorded file itself is NOT mirrored.)
     @State private var mirrorMe = true
     @State private var mirrorTutorial: Bool
-    /// How visible the tutorial ghost is in overlay mode.
-    @State private var ghostOpacity = 0.45
+    /// How visible the tutorial ghost is in ghost mode.
+    @State private var ghostOpacity = 0.5
     @State private var controlsVisible = true
 
     @State private var showSync = false
@@ -41,17 +49,42 @@ struct CompareView: View {
     @State private var scrubTime = 0.0
     @State private var wasPlayingBeforeScrub = false
 
+    // Ghost alignment (computed once, on demand).
+    @State private var alignState: CompareGhostAlignState = .idle
+    @State private var alignNonce = 0
+    @State private var tutorialBox: CGRect? = nil
+    @State private var takeBox: CGRect? = nil
+    @State private var tutorialAspect: CGFloat? = nil
+    @State private var takeAspect: CGFloat? = nil
+    /// Hand-made fine-tuning on top of the automatic alignment.
+    @State private var ghostPan: CGSize = .zero
+    @State private var ghostZoom: CGFloat = 1
+    @GestureState private var panDelta: CGSize = .zero
+    @GestureState private var zoomDelta: CGFloat = 1
+
+    // Coach mode.
+    @State private var report: AnalysisReport?
+    @State private var coachFindings: [AnalysisReport.Finding] = []
+    @State private var coachIndex = 0
+    @State private var coachPoses: CoachPoses? = nil
+    @State private var isReplaying = false
+    @State private var replayTask: Task<Void, Never>? = nil
+    @State private var replayRestore: CompareReplayRestore? = nil
+
     init(project: Project, take: Take, tutorialMirrored: Bool) {
         self.project = project
         self.take = take
         self.tutorialMirrored = tutorialMirrored
         _playback = State(initialValue: SyncedPlayback(project: project, take: take))
         _mirrorTutorial = State(initialValue: tutorialMirrored)
+        _report = State(initialValue: take.analysisReport)
     }
 
     // MARK: - Body
 
     var body: some View {
+        // This reader RESPECTS the safe area, so its insets are the real ones.
+        // Only the videos (a background layer) ignore the safe area.
         GeometryReader { geo in
             let landscape = geo.size.width > geo.size.height
             let insets = geo.safeAreaInsets
@@ -59,12 +92,11 @@ struct CompareView: View {
                 videoRegion(landscape: landscape, insets: insets)
                 // Portrait: the controls sit under the videos so they never cover them.
                 if !landscape && controlsVisible {
-                    portraitBar(insets: insets)
+                    portraitBar
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
         }
-        .ignoresSafeArea()
         .background(Color.black.ignoresSafeArea())
         .statusBarHidden()
         .preferredColorScheme(.dark)
@@ -76,99 +108,190 @@ struct CompareView: View {
         .task {
             await playback.load()
         }
+        .task(id: alignTrigger) {
+            await alignGhostIfNeeded()
+        }
+        .task(id: coachKey) {
+            await loadCoachPoses()
+        }
         .onDisappear {
+            cancelReplay()
             OrientationLock.portraitOnly()
             playback.tearDown()
             try? modelContext.save()
         }
-        .sheet(isPresented: $showAnalysis) {
+        .sheet(isPresented: $showAnalysis, onDismiss: {
+            report = take.analysisReport
+        }) {
             AnalysisView(
                 project: project,
                 take: take,
                 tutorialMirrored: mirrorTutorial,
                 takeMirrored: mirrorMe,
-                onJump: { time in playback.seek(to: time) }
+                onJump: { time in playback.seek(to: time) },
+                onCoach: { findings, index in
+                    showAnalysis = false
+                    report = take.analysisReport
+                    enterCoach(findings, at: index)
+                }
             )
             .presentationDetents([.medium, .large])
             .presentationBackgroundInteraction(.enabled(upThrough: .medium))
         }
     }
 
-    // MARK: - Videos
+    // MARK: - Videos (full-bleed background) + controls (inside the safe area)
 
-    /// The videos plus the floating controls. Tapping the video hides/shows them.
+    /// The videos behind, the controls in front. Tapping the video hides/shows
+    /// the controls (the coach card and the ghost gestures don't).
     private func videoRegion(landscape: Bool, insets: EdgeInsets) -> some View {
-        videoArea(landscape: landscape, insets: insets)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                controlsVisible.toggle()
-            }
-            .overlay(alignment: .top) {
-                if controlsVisible {
-                    topRow(insets: insets)
+        // Where the videos may reach into the safe area. In portrait the
+        // controls bar below them keeps its own black background.
+        let edges: Edge.Set = (landscape || !controlsVisible) ? .all : [.top, .horizontal]
+        return ZStack {
+            Color.clear
+                .ignoresSafeArea(.container, edges: edges)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    controlsVisible.toggle()
                 }
-            }
-            .overlay(alignment: .bottom) {
-                // Landscape: a compact panel floats over the bottom of the videos.
-                if landscape && controlsVisible {
-                    landscapeBar(insets: insets)
-                }
-            }
+                .simultaneousGesture(ghostPanGesture, including: isSideBySide ? .subviews : .all)
+                .simultaneousGesture(ghostZoomGesture, including: isSideBySide ? .subviews : .all)
+
+            controlsOverlay(landscape: landscape)
+        }
+        .background {
+            videoArea(landscape: landscape, insets: insets)
+                .ignoresSafeArea(.container, edges: edges)
+        }
     }
 
-    @ViewBuilder
+    /// Where the two pictures go (in the full-bleed area).
+    private static func paneRects(size: CGSize, landscape: Bool, sideBySide: Bool)
+        -> (you: CGRect, tutorial: CGRect) {
+        let full = CGRect(origin: .zero, size: size)
+        guard sideBySide else { return (full, full) }
+        let gap: CGFloat = 2
+        if landscape {
+            let width = (size.width - gap) / 2
+            return (CGRect(x: 0, y: 0, width: width, height: size.height),
+                    CGRect(x: width + gap, y: 0, width: width, height: size.height))
+        } else {
+            let height = (size.height - gap) / 2
+            return (CGRect(x: 0, y: 0, width: size.width, height: height),
+                    CGRect(x: 0, y: height + gap, width: size.width, height: height))
+        }
+    }
+
+    /// Always the same two video views (only their frames change), so rotating
+    /// or switching to ghost never restarts anything.
     private func videoArea(landscape: Bool, insets: EdgeInsets) -> some View {
-        // The YOU badge sits below the top buttons while they are visible.
-        let youTop = max(insets.top, 8) + (controlsVisible ? 48 : 0)
-        ZStack {
-            Color.black
+        GeometryReader { geo in
+            let size = geo.size
+            let rects = Self.paneRects(size: size, landscape: landscape, sideBySide: isSideBySide)
 
-            if isSideBySide {
-                // AnyLayout keeps the same views when the phone rotates.
-                let layout = landscape
-                    ? AnyLayout(HStackLayout(spacing: 2))
-                    : AnyLayout(VStackLayout(spacing: 2))
-                layout {
-                    pane(title: "YOU", top: youTop, leading: insets.leading + 10) {
-                        youVideo
-                    }
-                    pane(title: "TUTORIAL", top: 10, leading: 10) {
-                        tutorialVideo
-                    }
+            let auto = autoGhostTransform(container: size)
+            let zoom = min(max(ghostZoom * zoomDelta, 0.3), 4)
+            let ghostScale: CGFloat = isSideBySide ? 1 : auto.scale * zoom
+            let ghostOffset: CGSize = isSideBySide ? .zero : CGSize(
+                width: auto.offset.width + ghostPan.width + panDelta.width,
+                height: auto.offset.height + ghostPan.height + panDelta.height
+            )
+
+            let overlayOn = showsPoseOverlay
+            let highlight: Set<Joint> = {
+                guard overlayOn, let finding = currentFinding else { return [] }
+                return CoachSupport.joints(forBodyPart: finding.bodyPart)
+            }()
+
+            ZStack {
+                Color.black
+
+                youLayer(rect: rects.you, overlayOn: overlayOn, highlight: highlight)
+
+                tutorialLayer(rect: rects.tutorial, scale: ghostScale, offset: ghostOffset,
+                              overlayOn: overlayOn, highlight: highlight)
+
+                if isSideBySide {
+                    badge("YOU", origin: badgeOrigin(for: rects.you, insets: insets))
+                    badge("TUTORIAL", origin: badgeOrigin(for: rects.tutorial, insets: insets))
                 }
-            } else {
-                // Overlay: you underneath, the tutorial as a ghost on top.
-                ZStack {
-                    youVideo
-                    tutorialVideo
-                        .opacity(ghostOpacity)
-                        .allowsHitTesting(false)
-                }
+
+                statusOverlay
             }
+            .frame(width: size.width, height: size.height)
+            .clipped()
+            .animation(.snappy(duration: 0.3), value: isSideBySide)
+        }
+        .allowsHitTesting(false)
+    }
 
-            statusOverlay
+    private func youLayer(rect: CGRect, overlayOn: Bool, highlight: Set<Joint>) -> some View {
+        ZStack {
+            youVideo
+            if overlayOn {
+                poseLayer(pose: coachPoses?.take, mirrored: mirrorMe, color: .white,
+                          highlight: highlight, paneSize: rect.size)
+            }
+        }
+        .frame(width: rect.width, height: rect.height)
+        .position(x: rect.midX, y: rect.midY)
+    }
+
+    private func tutorialLayer(rect: CGRect, scale: CGFloat, offset: CGSize,
+                               overlayOn: Bool, highlight: Set<Joint>) -> some View {
+        ZStack {
+            tutorialVideo
+                .opacity(isSideBySide ? 1 : ghostOpacity)
+            if overlayOn {
+                poseLayer(pose: coachPoses?.tutorial, mirrored: mirrorTutorial, color: Theme.loopColor,
+                          highlight: highlight, paneSize: rect.size)
+            }
+        }
+        .frame(width: rect.width, height: rect.height)
+        // Ghost alignment: the skeleton rides along with the picture.
+        .scaleEffect(scale)
+        .offset(offset)
+        .position(x: rect.midX, y: rect.midY)
+    }
+
+    /// A skeleton drawn exactly over an aspect-fit video inside a pane.
+    @ViewBuilder
+    private func poseLayer(pose: PoseSample?, mirrored: Bool, color: Color,
+                           highlight: Set<Joint>, paneSize: CGSize) -> some View {
+        if let pose, pose.aspect > 0, paneSize.width > 0, paneSize.height > 0 {
+            let aspect = CGFloat(pose.aspect)
+            let fit = CoachSupport.aspectFitRect(aspect: aspect, in: paneSize)
+            PoseOverlay(pose: pose, videoAspect: aspect, mirrored: mirrored,
+                        color: color, highlight: highlight)
+                .frame(width: fit.width, height: fit.height)
+                .position(x: fit.midX, y: fit.midY)
+                .frame(width: paneSize.width, height: paneSize.height)
+                .allowsHitTesting(false)
         }
     }
 
-    /// One video with a small translucent capsule badge in its top-leading corner.
-    private func pane<Content: View>(title: String, top: CGFloat, leading: CGFloat,
-                                     @ViewBuilder content: () -> Content) -> some View {
-        ZStack(alignment: .topLeading) {
-            content()
-            Text(title)
-                .font(.system(.caption2, design: .rounded).weight(.semibold))
-                .tracking(1.2)
-                .foregroundStyle(Color.white.opacity(0.92))
-                .padding(.horizontal, 9)
-                .padding(.vertical, 4)
-                .background(Capsule().fill(Color.black.opacity(0.42)))
-                .padding(.top, top)
-                .padding(.leading, leading)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .clipped()
+    /// Top-left corner of a pane's badge, kept below the top buttons.
+    private func badgeOrigin(for rect: CGRect, insets: EdgeInsets) -> CGPoint {
+        let x = max(rect.minX, insets.leading) + 10
+        let touchesTop = rect.minY < 1
+        let y = touchesTop ? insets.top + (controlsVisible ? 56 : 8) : rect.minY + 10
+        return CGPoint(x: x, y: y)
+    }
+
+    /// Small translucent capsule ("YOU" / "TUTORIAL").
+    private func badge(_ title: String, origin: CGPoint) -> some View {
+        Text(title)
+            .font(.system(.caption2, design: .rounded).weight(.semibold))
+            .tracking(1.2)
+            .foregroundStyle(Color.white.opacity(0.92))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(Color.black.opacity(0.42)))
+            .padding(.leading, origin.x)
+            .padding(.top, origin.y)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .accessibilityHidden(true)
     }
 
     private var youVideo: some View {
@@ -198,9 +321,30 @@ struct CompareView: View {
         }
     }
 
-    // MARK: - Top row (close, layout, mirror, sync, analyze)
+    // MARK: - Controls layer (inside the safe area)
 
-    private func topRow(insets: EdgeInsets) -> some View {
+    private func controlsOverlay(landscape: Bool) -> some View {
+        VStack(spacing: 8) {
+            if controlsVisible {
+                topRow(landscape: landscape)
+            }
+            Spacer(minLength: 0)
+            if let finding = currentFinding {
+                coachCard(finding, landscape: landscape)
+                    .padding(.horizontal, 12)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+            if landscape && controlsVisible {
+                landscapeBar
+            }
+        }
+        .padding(.bottom, 8)
+        .animation(.snappy, value: coachActive)
+    }
+
+    // MARK: Top row (close, issues, mode, mirror, sync, analyze)
+
+    private func topRow(landscape: Bool) -> some View {
         GlassGroup(spacing: 10) {
             HStack(spacing: 10) {
                 Button {
@@ -211,15 +355,17 @@ struct CompareView: View {
                 .buttonStyle(.round(size: 40))
                 .accessibilityLabel("Close")
 
+                if let count = fixCount, !coachActive {
+                    fixCapsule(count)
+                }
+
                 Spacer(minLength: 0)
 
-                Button {
-                    isSideBySide.toggle()
-                } label: {
-                    Image(systemName: isSideBySide ? "rectangle.split.2x1" : "square.on.square")
+                if landscape {
+                    // Plenty of room in landscape: the mode switch lives up here.
+                    modePicker
+                        .frame(width: 220)
                 }
-                .buttonStyle(.round(size: 40, isOn: !isSideBySide, tint: Theme.loopColor))
-                .accessibilityLabel(isSideBySide ? "Switch to overlay" : "Switch to side by side")
 
                 mirrorMenu
 
@@ -252,9 +398,33 @@ struct CompareView: View {
                 .accessibilityLabel("Analyze")
             }
         }
-        .padding(.top, max(insets.top, 8))
-        .padding(.leading, insets.leading + 12)
-        .padding(.trailing, insets.trailing + 12)
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+    }
+
+    /// "3 things to fix": opens coach mode at the first issue.
+    private func fixCapsule(_ count: Int) -> some View {
+        Button {
+            showIssues()
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .font(.system(size: 12, weight: .bold))
+                Text(count == 1 ? "1 thing to fix" : "\(count) things to fix")
+                    .font(.system(.caption, design: .rounded).weight(.bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .foregroundStyle(Color.black)
+            .padding(.horizontal, 11)
+            .frame(height: 32)
+            .background(Capsule().fill(Theme.accent))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(!playback.isReady)
+        .opacity(playback.isReady ? 1 : 0.5)
+        .accessibilityLabel("Show issues")
     }
 
     /// Mirror switches live in a menu to save space.
@@ -273,11 +443,28 @@ struct CompareView: View {
         .accessibilityLabel("Mirror options")
     }
 
-    // MARK: - Bottom controls
+    /// "Side by side" | "Ghost".
+    private var modePicker: some View {
+        PillPicker<Bool>(
+            options: [
+                PillPicker<Bool>.Option(value: true, title: "Side by side",
+                                        accessibilityLabel: "Side by side"),
+                PillPicker<Bool>.Option(value: false, title: "Ghost",
+                                        accessibilityLabel: "Ghost")
+            ],
+            selection: isSideBySide,
+            onSelect: { newValue in
+                withAnimation(.snappy) { isSideBySide = newValue }
+            }
+        )
+    }
 
-    private func portraitBar(insets: EdgeInsets) -> some View {
+    // MARK: Bottom controls
+
+    private var portraitBar: some View {
         GlassGroup(spacing: 10) {
-            VStack(spacing: 14) {
+            VStack(spacing: 12) {
+                modePicker
                 if !isSideBySide {
                     ghostRow
                 }
@@ -286,13 +473,14 @@ struct CompareView: View {
                 speedPicker
             }
         }
-        .padding(.horizontal, max(insets.leading, insets.trailing) + 16)
+        .padding(.horizontal, 16)
         .padding(.top, 10)
-        .padding(.bottom, max(insets.bottom, 10))
-        .background(Color.black)
+        .padding(.bottom, 8)
+        // Black all the way down behind the home indicator.
+        .background(Color.black.ignoresSafeArea(.container, edges: .bottom))
     }
 
-    private func landscapeBar(insets: EdgeInsets) -> some View {
+    private var landscapeBar: some View {
         GlassGroup(spacing: 10) {
             VStack(spacing: 6) {
                 if !isSideBySide {
@@ -316,9 +504,7 @@ struct CompareView: View {
             }
         }
         .frame(maxWidth: 640)
-        .padding(.leading, insets.leading + 12)
-        .padding(.trailing, insets.trailing + 12)
-        .padding(.bottom, max(insets.bottom, 8))
+        .padding(.horizontal, 12)
     }
 
     // MARK: - Control pieces
@@ -396,6 +582,19 @@ struct CompareView: View {
 
     private var timelineBlock: some View {
         VStack(spacing: 2) {
+            let markers = markerFindings
+            if !markers.isEmpty {
+                CompareFindingMarkers(
+                    times: markers.map(\.time),
+                    labels: markers.map { "Issue at \(formatTime($0.time)): \($0.bodyPart)" },
+                    selected: markers.firstIndex { $0.id == currentFinding?.id },
+                    lower: playback.range.lowerBound,
+                    upper: playback.range.upperBound,
+                    onTap: { index in
+                        enterCoach(markers, at: index)
+                    }
+                )
+            }
             CompareTimelineBar(
                 value: shownTime,
                 lower: playback.range.lowerBound,
@@ -444,6 +643,7 @@ struct CompareView: View {
             // Finger down: remember if we were playing, then pause.
             wasPlayingBeforeScrub = playback.isPlaying
             isScrubbing = true
+            cancelReplay()
             playback.pause()
         }
         scrubTime = time
@@ -468,7 +668,9 @@ struct CompareView: View {
         return "8-count \(index + 1) · \(beat)"
     }
 
-    /// Opacity slider for the ghost (overlay mode only).
+    // MARK: - Ghost mode
+
+    /// Opacity slider, "Auto-align" and a tiny status (ghost mode only).
     private var ghostRow: some View {
         HStack(spacing: 10) {
             Image(systemName: "circle.lefthalf.filled")
@@ -477,10 +679,490 @@ struct CompareView: View {
                 .accessibilityHidden(true)
             Slider(value: $ghostOpacity, in: 0.2...0.8)
                 .tint(Theme.loopColor)
-                .accessibilityLabel("Tutorial ghost opacity")
+                .accessibilityLabel("Ghost opacity")
+            if let status = ghostStatusText {
+                Text(status)
+                    .font(.system(.caption2, design: .rounded).weight(.semibold))
+                    .foregroundStyle(Theme.secondaryText)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .transition(.opacity)
+            }
+            Button {
+                autoAlign()
+            } label: {
+                Image(systemName: "wand.and.stars")
+            }
+            .buttonStyle(.round(size: 36))
+            .accessibilityLabel("Auto-align ghost")
         }
         .padding(.horizontal, 4)
-        .frame(height: 32)
+        .frame(height: 38)
+        .animation(.snappy, value: alignState)
+    }
+
+    private var ghostStatusText: String? {
+        switch alignState {
+        case .aligning: return "Aligning…"
+        case .failed: return "Not aligned"
+        case .idle, .done: return nil
+        }
+    }
+
+    private var alignTrigger: CompareAlignTrigger {
+        CompareAlignTrigger(ready: playback.isReady, ghost: !isSideBySide, nonce: alignNonce)
+    }
+
+    /// Drag the ghost to move it.
+    private var ghostPanGesture: some Gesture {
+        DragGesture(minimumDistance: 6)
+            .updating($panDelta) { value, state, _ in
+                state = value.translation
+            }
+            .onEnded { value in
+                ghostPan = CGSize(width: ghostPan.width + value.translation.width,
+                                  height: ghostPan.height + value.translation.height)
+            }
+    }
+
+    /// Pinch to resize the ghost.
+    private var ghostZoomGesture: some Gesture {
+        MagnifyGesture()
+            .updating($zoomDelta) { value, state, _ in
+                state = value.magnification
+            }
+            .onEnded { value in
+                ghostZoom = min(max(ghostZoom * value.magnification, 0.3), 4)
+            }
+    }
+
+    /// Scale + offset that puts the tutorial dancer on top of you.
+    private func autoGhostTransform(container: CGSize) -> (scale: CGFloat, offset: CGSize) {
+        guard alignState == .done,
+              let tutorialBox, let takeBox, let tutorialAspect, let takeAspect,
+              container.width > 0, container.height > 0 else {
+            return (1, .zero)
+        }
+        return CoachSupport.ghostTransform(
+            tutorialBox: tutorialBox, tutorialAspect: tutorialAspect, tutorialMirrored: mirrorTutorial,
+            takeBox: takeBox, takeAspect: takeAspect, takeMirrored: mirrorMe,
+            container: container
+        )
+    }
+
+    /// Back to the automatic alignment (and try again if it failed).
+    private func autoAlign() {
+        withAnimation(.snappy) {
+            ghostPan = .zero
+            ghostZoom = 1
+        }
+        if alignState != .done && alignState != .aligning {
+            alignState = .idle
+            alignNonce += 1
+        }
+    }
+
+    /// Finds both bodies once (over the part of the dance your take covers).
+    private func alignGhostIfNeeded() async {
+        guard playback.isReady, !isSideBySide else { return }
+        // A cancelled earlier run may still be winding down: let it finish first.
+        while alignState == .aligning && !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        guard !Task.isCancelled, playback.isReady, !isSideBySide else { return }
+        guard alignState == .idle || alignState == .failed else { return }
+        guard let tutorialURL = project.videoURL else {
+            alignState = .failed
+            return
+        }
+        alignState = .aligning
+
+        let range = playback.range
+        let timing = take.timing
+        let takeURL = take.videoURL
+        let takeFrom = max(timing.takeTime(forTutorialTime: range.lowerBound), 0)
+        let takeTo = max(timing.takeTime(forTutorialTime: range.upperBound), takeFrom)
+
+        async let tutorialBodyBox = CoachSupport.averageBodyBox(
+            url: tutorialURL, from: range.lowerBound, to: range.upperBound)
+        async let takeBodyBox = CoachSupport.averageBodyBox(
+            url: takeURL, from: takeFrom, to: takeTo)
+        async let tutorialShape = Self.videoAspect(of: tutorialURL)
+        async let takeShape = Self.videoAspect(of: takeURL)
+
+        let tBox = await tutorialBodyBox
+        let kBox = await takeBodyBox
+        let tAspect = await tutorialShape
+        let kAspect = await takeShape
+
+        if Task.isCancelled {
+            alignState = .idle
+            return
+        }
+        if let tBox, let kBox, let tAspect, let kAspect {
+            tutorialBox = tBox
+            takeBox = kBox
+            tutorialAspect = tAspect
+            takeAspect = kAspect
+            alignState = .done
+        } else {
+            // No body found: the ghost simply stays centered.
+            alignState = .failed
+        }
+    }
+
+    /// Display width / height of a video (rotation taken into account).
+    nonisolated private static func videoAspect(of url: URL) async -> CGFloat? {
+        let asset = AVURLAsset(url: url)
+        do {
+            guard let track = try await asset.loadTracks(withMediaType: .video).first else { return nil }
+            let size = try await track.load(.naturalSize)
+            let transform = try await track.load(.preferredTransform)
+            let shown = CGRect(origin: .zero, size: size).applying(transform)
+            let width = abs(shown.width)
+            let height = abs(shown.height)
+            guard width > 0, height > 0 else { return nil }
+            return width / height
+        } catch {
+            return nil
+        }
+    }
+
+    // MARK: - Coach mode
+
+    private var currentFinding: AnalysisReport.Finding? {
+        coachFindings.indices.contains(coachIndex) ? coachFindings[coachIndex] : nil
+    }
+
+    private var coachActive: Bool { currentFinding != nil }
+
+    private var coachKey: CompareCoachKey {
+        CompareCoachKey(finding: currentFinding?.id, index: coachIndex)
+    }
+
+    /// Skeletons are shown only while the picture is parked on the moment.
+    private var showsPoseOverlay: Bool {
+        guard let finding = currentFinding, coachPoses != nil,
+              !playback.isPlaying, !isReplaying else { return false }
+        return abs(playback.currentTime - finding.time) < 0.3
+    }
+
+    /// Every issue of the saved analysis that lies in the take, by time.
+    private var markerFindings: [AnalysisReport.Finding] {
+        guard let report else { return [] }
+        var seenIDs = Set<UUID>()
+        var seenKeys = Set<String>()
+        var result: [AnalysisReport.Finding] = []
+        let all = report.topFindings + report.segments.flatMap { $0.findings }
+        for finding in all {
+            let key = "\(finding.bodyPart)|\(finding.message)|\(Int((finding.time * 10).rounded()))"
+            guard seenIDs.insert(finding.id).inserted, seenKeys.insert(key).inserted else { continue }
+            guard playback.range.contains(finding.time) else { continue }
+            result.append(finding)
+        }
+        return result.sorted { $0.time < $1.time }
+    }
+
+    /// How many things the accent capsule says need fixing (nil = no report).
+    private var fixCount: Int? {
+        guard let report else { return nil }
+        let count = report.topFindings.isEmpty ? markerFindings.count : report.topFindings.count
+        return count > 0 ? count : nil
+    }
+
+    private func showIssues() {
+        guard let report else { return }
+        let list = report.topFindings.isEmpty ? markerFindings : report.topFindings
+        enterCoach(list, at: 0)
+    }
+
+    private func enterCoach(_ findings: [AnalysisReport.Finding], at index: Int) {
+        guard !findings.isEmpty else { return }
+        cancelReplay()
+        playback.pause()
+        let safe = min(max(index, 0), findings.count - 1)
+        coachFindings = findings
+        coachIndex = safe
+        coachPoses = nil
+        controlsVisible = true
+        playback.seek(to: findings[safe].time)
+    }
+
+    private func stepCoach(_ delta: Int) {
+        let next = coachIndex + delta
+        guard coachFindings.indices.contains(next) else { return }
+        cancelReplay()
+        playback.pause()
+        coachIndex = next
+        coachPoses = nil
+        playback.seek(to: coachFindings[next].time)
+    }
+
+    private func closeCoach() {
+        cancelReplay()
+        coachFindings = []
+        coachIndex = 0
+        coachPoses = nil
+    }
+
+    /// Finds both skeletons for the current issue.
+    private func loadCoachPoses() async {
+        guard let finding = currentFinding, let tutorialURL = project.videoURL else {
+            coachPoses = nil
+            return
+        }
+        let takeTime = max(take.timing.takeTime(forTutorialTime: finding.time), 0)
+        let result = await CoachSupport.poses(
+            tutorialURL: tutorialURL, tutorialTime: finding.time,
+            takeURL: take.videoURL, takeTime: takeTime
+        )
+        guard !Task.isCancelled, currentFinding?.id == finding.id else { return }
+        coachPoses = result
+    }
+
+    /// Plays 3 seconds around the moment at half speed, then parks on it again.
+    private func replayMoment() {
+        guard let finding = currentFinding, playback.isReady else { return }
+        cancelReplay()
+        let range = playback.range
+        let start = min(max(finding.time - 1.5, range.lowerBound), range.upperBound)
+        let end = min(start + 3, range.upperBound)
+
+        replayRestore = CompareReplayRestore(rate: playback.rate, loop: playback.isLooping)
+        isReplaying = true
+        playback.pause()
+        playback.isLooping = false
+        playback.setRate(0.5)
+        playback.seek(to: start)
+        playback.play()
+
+        replayTask = Task { @MainActor in
+            let began = CACurrentMediaTime()
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 40_000_000)
+                if !playback.isPlaying { break }
+                if playback.currentTime >= end - 0.02 { break }
+                // Safety net: 3 s at half speed is 6 s.
+                if CACurrentMediaTime() - began > 9 { break }
+            }
+            guard !Task.isCancelled else { return }
+            playback.pause()
+            endReplay()
+            if let finding = currentFinding {
+                playback.seek(to: finding.time)
+            }
+        }
+    }
+
+    /// Stops a running replay (if any) and restores speed and loop.
+    private func cancelReplay() {
+        replayTask?.cancel()
+        replayTask = nil
+        endReplay()
+    }
+
+    private func endReplay() {
+        if let restore = replayRestore {
+            playback.setRate(restore.rate)
+            playback.isLooping = restore.loop
+            replayRestore = nil
+        }
+        isReplaying = false
+    }
+
+    // MARK: Coach card
+
+    private func coachCard(_ finding: AnalysisReport.Finding, landscape: Bool) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+        return GlassGroup(spacing: 8) {
+            Group {
+                if landscape {
+                    HStack(spacing: 12) {
+                        coachText(finding)
+                        Spacer(minLength: 8)
+                        coachControls
+                        closeCoachButton
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .top, spacing: 8) {
+                            coachText(finding)
+                            Spacer(minLength: 0)
+                            closeCoachButton
+                        }
+                        coachControls
+                    }
+                }
+            }
+            .padding(landscape ? 10 : 12)
+            .background(shape.fill(Color.black.opacity(0.3)))
+            .glassSurface(shape, fallback: Theme.surface.opacity(0.94))
+            .overlay(shape.strokeBorder(Theme.hairline, lineWidth: 1))
+            .contentShape(shape)
+            // Taps on the card must not hide the controls.
+            .onTapGesture {}
+        }
+        .frame(maxWidth: landscape ? 700 : .infinity)
+    }
+
+    private func coachText(_ finding: AnalysisReport.Finding) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(finding.bodyPart.uppercased())
+                .font(.system(.caption2, design: .rounded).weight(.bold))
+                .tracking(1.2)
+                .foregroundStyle(Theme.accent)
+                .lineLimit(1)
+            Text(finding.message)
+                .font(.system(.headline, design: .rounded))
+                .foregroundStyle(Color.white)
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(coachWhen(finding))
+                .font(.system(.caption, design: .rounded).weight(.medium))
+                .monospacedDigit()
+                .foregroundStyle(Theme.secondaryText)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func coachWhen(_ finding: AnalysisReport.Finding) -> String {
+        if let eightCount = finding.eightCount, let beat = finding.beat {
+            return "8-count \(eightCount + 1) · count \(beat)"
+        }
+        if let eightCount = finding.eightCount {
+            return "8-count \(eightCount + 1)"
+        }
+        return formatTime(finding.time)
+    }
+
+    /// "1 / 5"  ‹  ›  [Replay]
+    private var coachControls: some View {
+        HStack(spacing: 8) {
+            Text("\(coachIndex + 1) / \(coachFindings.count)")
+                .font(.system(.subheadline, design: .rounded).weight(.bold))
+                .monospacedDigit()
+                .foregroundStyle(Color.white)
+                .padding(.trailing, 4)
+                .accessibilityLabel("Issue \(coachIndex + 1) of \(coachFindings.count)")
+
+            Spacer(minLength: 0)
+
+            Button {
+                stepCoach(-1)
+            } label: {
+                Image(systemName: "chevron.left")
+            }
+            .buttonStyle(.round(size: 40))
+            .disabled(coachIndex <= 0)
+            .opacity(coachIndex <= 0 ? 0.4 : 1)
+            .accessibilityLabel("Previous issue")
+
+            Button {
+                stepCoach(1)
+            } label: {
+                Image(systemName: "chevron.right")
+            }
+            .buttonStyle(.round(size: 40))
+            .disabled(coachIndex >= coachFindings.count - 1)
+            .opacity(coachIndex >= coachFindings.count - 1 ? 0.4 : 1)
+            .accessibilityLabel("Next issue")
+
+            Button {
+                if isReplaying {
+                    cancelReplay()
+                    playback.pause()
+                    if let finding = currentFinding {
+                        playback.seek(to: finding.time)
+                    }
+                } else {
+                    replayMoment()
+                }
+            } label: {
+                Image(systemName: "gobackward")
+            }
+            .buttonStyle(.round(size: 40, isOn: isReplaying, tint: Theme.loopColor))
+            .disabled(!playback.isReady)
+            .accessibilityLabel("Replay this moment")
+        }
+    }
+
+    private var closeCoachButton: some View {
+        Button {
+            closeCoach()
+        } label: {
+            Image(systemName: "xmark")
+        }
+        .buttonStyle(.round(size: 36))
+        .accessibilityLabel("Close coach")
+    }
+}
+
+// MARK: - Small helper types
+
+private enum CompareGhostAlignState: Equatable {
+    case idle, aligning, done, failed
+}
+
+/// Changes whenever the ghost alignment should be (re)started.
+private struct CompareAlignTrigger: Hashable {
+    var ready: Bool
+    var ghost: Bool
+    var nonce: Int
+}
+
+/// Changes whenever the skeletons have to be loaded again.
+private struct CompareCoachKey: Hashable {
+    var finding: UUID?
+    var index: Int
+}
+
+/// Speed and loop setting to bring back after "Replay this moment".
+private struct CompareReplayRestore {
+    var rate: Float
+    var loop: Bool
+}
+
+// MARK: - Finding markers (red dots above the timeline)
+
+/// A thin row of small red dots, one per issue, lined up with the timeline
+/// track below it. Tap a dot to open coach mode at that issue.
+private struct CompareFindingMarkers: View {
+    let times: [Double]
+    let labels: [String]
+    let selected: Int?
+    let lower: Double
+    let upper: Double
+    let onTap: (Int) -> Void
+
+    private let knobSize: CGFloat = 14
+
+    private var span: Double { max(upper - lower, 0.0001) }
+
+    var body: some View {
+        GeometryReader { geo in
+            let usable = max(geo.size.width - knobSize, 1)
+            ForEach(Array(times.enumerated()), id: \.offset) { index, time in
+                let fraction = CGFloat(min(max((time - lower) / span, 0), 1))
+                let isSelected = selected == index
+                Button {
+                    onTap(index)
+                } label: {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: isSelected ? 11 : 7, height: isSelected ? 11 : 7)
+                        .overlay(Circle().strokeBorder(Color.white, lineWidth: isSelected ? 1.5 : 0))
+                        .frame(width: 24, height: 20)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(labels.indices.contains(index) ? labels[index] : "Issue")
+                .position(x: knobSize / 2 + usable * fraction, y: geo.size.height / 2)
+            }
+        }
+        .frame(height: 20)
     }
 }
 
@@ -706,7 +1388,9 @@ private final class CompareLayerHostView: UIView {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = .black
+        // Clear: the tutorial can then be a see-through ghost (the screen
+        // behind the videos is black anyway).
+        backgroundColor = .clear
         playerLayer.videoGravity = .resizeAspect
         // Taps go to SwiftUI (tap to hide/show the controls).
         isUserInteractionEnabled = false

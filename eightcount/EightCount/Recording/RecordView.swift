@@ -101,15 +101,22 @@ struct RecordView: View {
     // MARK: - Main screen
 
     private var recordingScreen: some View {
-        ZStack {
-            mediaLayer
-            controlsLayer
-            countdownOverlay
-            cameraStatus
-            if model.phase == .saved {
-                resultPanel
-                    .transition(.scale(scale: 0.9).combined(with: .opacity))
+        // This outer reader RESPECTS the safe area (no ignoresSafeArea), so
+        // `safeAreaInsets` are the real notch / Dynamic Island / home
+        // indicator insets. Only the pictures behind (mediaLayer) go
+        // full-bleed; every button, chip and panel stays inside the safe area.
+        GeometryReader { outer in
+            ZStack {
+                mediaLayer(insets: outer.safeAreaInsets)
+                controlsLayer
+                countdownOverlay
+                cameraStatus
+                if model.phase == .saved {
+                    resultPanel
+                        .transition(.scale(scale: 0.9).combined(with: .opacity))
+                }
             }
+            .frame(width: outer.size.width, height: outer.size.height)
         }
         .animation(.snappy, value: model.phase)
     }
@@ -148,10 +155,11 @@ struct RecordView: View {
 
     /// The two pictures. They are always the same two views (only their
     /// frames change), so switching layout never restarts the camera.
-    private var mediaLayer: some View {
+    /// - Parameter insets: the REAL safe-area insets, read by the caller
+    ///   outside the full-bleed area (inside it they would read as 0).
+    private func mediaLayer(insets: EdgeInsets) -> some View {
         GeometryReader { geo in
             let size = geo.size
-            let insets = geo.safeAreaInsets
             let landscape = size.width > size.height
             let ghost = layout == .ghost
             let rects = Self.tileRects(size: size, landscape: landscape, ghost: ghost)
