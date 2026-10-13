@@ -36,8 +36,13 @@ User asked for (subagents must use model "sonnet" to save tokens):
 - Added `eightcount/setup-mac.sh` (one-command local setup) and `eightcount/.gitignore`.
 - Fixed README: decision bullets had been pasted into the feature list.
 
+- RESULT run 38425842568: Xcode 27 (27A266a, iPhoneOS27.0 SDK) and Xcode 26: BUILD SUCCEEDED, 0 errors.
+  Only Sendable warnings in CameraRecorder -> silenced with `@preconcurrency import AVFoundation`.
+- Added CI job "Launch in Simulator (Xcode 27)": boots an iPhone simulator, installs, launches,
+  checks the process is alive after 12 s, uploads launch.png.
+
 ## Next step
-- Watch the "EightCount iOS build" run; fix every compile error; re-push until both jobs are green.
+- Check the simulator smoke job result + screenshot; fix any runtime crash.
 - On the Mac: `cd eightcount && xcodegen generate && open EightCount.xcodeproj`, build, and fix any
   first-build errors (see README → "Check on Mac").
 - Then test record → compare → analyze on the iPhone (README → Check on Mac, section D).
