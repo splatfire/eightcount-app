@@ -24,6 +24,11 @@ struct CompareView: View {
     let project: Project
     let take: Take
     let tutorialMirrored: Bool
+    /// Start playing (from the start of the range, looping) as soon as both
+    /// videos are ready.
+    let autoPlay: Bool
+    /// When set, the top bar shows a red "Record again" button that calls it.
+    let onRecordAgain: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -43,6 +48,8 @@ struct CompareView: View {
     @State private var showSync = false
     @State private var showAnalysis = false
     @State private var showExport = false
+    /// Auto-play happens once per screen.
+    @State private var didAutoPlay = false
 
     /// While the slider thumb is dragged we show this value instead of the
     /// real playhead, so updates don't fight your finger.
@@ -72,10 +79,13 @@ struct CompareView: View {
     @State private var replayTask: Task<Void, Never>? = nil
     @State private var replayRestore: CompareReplayRestore? = nil
 
-    init(project: Project, take: Take, tutorialMirrored: Bool) {
+    init(project: Project, take: Take, tutorialMirrored: Bool,
+         autoPlay: Bool = true, onRecordAgain: (() -> Void)? = nil) {
         self.project = project
         self.take = take
         self.tutorialMirrored = tutorialMirrored
+        self.autoPlay = autoPlay
+        self.onRecordAgain = onRecordAgain
         _playback = State(initialValue: SyncedPlayback(project: project, take: take))
         _mirrorTutorial = State(initialValue: tutorialMirrored)
         _report = State(initialValue: take.analysisReport)
@@ -108,6 +118,7 @@ struct CompareView: View {
         }
         .task {
             await playback.load()
+            startAutoPlayIfNeeded()
         }
         .task(id: alignTrigger) {
             await alignGhostIfNeeded()
@@ -147,6 +158,15 @@ struct CompareView: View {
             // float with inset rounded corners on iOS 26+, which looked misaligned.)
             .presentationDetents([.large])
         }
+    }
+
+    /// Starts playing from the range start once everything is loaded.
+    private func startAutoPlayIfNeeded() {
+        guard autoPlay, !didAutoPlay, !Task.isCancelled,
+              playback.isReady, !playback.isPlaying else { return }
+        didAutoPlay = true
+        SyncedPlayback.activateAudioSession()
+        playback.play()
     }
 
     // MARK: - Videos (full-bleed background) + controls (inside the safe area)
@@ -367,8 +387,19 @@ struct CompareView: View {
                 .buttonStyle(.round(size: 40))
                 .accessibilityLabel("Close")
 
+                if let onRecordAgain {
+                    Button {
+                        onRecordAgain()
+                    } label: {
+                        Image(systemName: "record.circle")
+                            .foregroundStyle(Color.red)
+                    }
+                    .buttonStyle(.round(size: 40))
+                    .accessibilityLabel("Record again")
+                }
+
                 if let count = fixCount, !coachActive {
-                    fixCapsule(count)
+                    fixCapsule(count, compact: onRecordAgain != nil && !landscape)
                 }
 
                 Spacer(minLength: 0)
@@ -424,14 +455,15 @@ struct CompareView: View {
     }
 
     /// "3 things to fix": opens coach mode at the first issue.
-    private func fixCapsule(_ count: Int) -> some View {
+    private func fixCapsule(_ count: Int, compact: Bool = false) -> some View {
         Button {
             showIssues()
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: "exclamationmark.circle.fill")
                     .font(.system(size: 12, weight: .bold))
-                Text(count == 1 ? "1 thing to fix" : "\(count) things to fix")
+                Text(compact ? "\(count) to fix"
+                     : (count == 1 ? "1 thing to fix" : "\(count) things to fix"))
                     .font(.system(.caption, design: .rounded).weight(.bold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -591,7 +623,14 @@ struct CompareView: View {
         return PillPicker<Float>(
             options: options,
             selection: playback.rate,
-            onSelect: { playback.setRate($0) }
+            onSelect: { speed in
+                // Picking a speed while paused just starts playing at it.
+                let wasPlaying = playback.isPlaying
+                playback.setRate(speed)
+                if !wasPlaying && playback.isReady {
+                    playback.play()
+                }
+            }
         )
     }
 

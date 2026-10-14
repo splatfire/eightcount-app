@@ -19,7 +19,10 @@ struct RecordView: View {
     let rate: Double
     /// Show the tutorial flipped, like a mirror.
     let tutorialMirrored: Bool
-    /// Called with the saved take ("Compare"), or nil when closed without comparing.
+    /// Called with nil when the screen is closed without a take (X, "Done",
+    /// discarded). A saved take is reviewed right here (instant replay), and
+    /// closing that review dismisses the cover by itself, so this is not
+    /// called with a take any more (the parameter stays for the call site).
     let onFinished: (Take?) -> Void
 
     @Environment(\.modelContext) private var modelContext
@@ -29,6 +32,8 @@ struct RecordView: View {
     @State private var layout: RecordLayout = .sideBySide
     @State private var ghostOpacity = 0.45
     @State private var showDiscardDialog = false
+    /// Beeps with the 3-2-1 (also read by the record flow from UserDefaults).
+    @AppStorage("countdownSound") private var countdownSound = true
 
     init(project: Project, startTime: Double, endTime: Double?, rate: Double,
          tutorialMirrored: Bool, onFinished: @escaping (Take?) -> Void) {
@@ -46,7 +51,18 @@ struct RecordView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            if model.recorder.authorization == .denied || model.recorder.authorization == .restricted {
+            if let take = model.reviewTake {
+                // Instant replay of the take that was just saved. Its own
+                // Close dismisses this whole cover.
+                CompareView(
+                    project: project,
+                    take: take,
+                    tutorialMirrored: tutorialMirrored,
+                    autoPlay: true,
+                    onRecordAgain: { recordAgainFromReview() }
+                )
+                .transition(.opacity)
+            } else if model.recorder.authorization == .denied || model.recorder.authorization == .restricted {
                 permissionDeniedView
             } else {
                 recordingScreen
@@ -111,14 +127,16 @@ struct RecordView: View {
                 controlsLayer
                 countdownOverlay
                 cameraStatus
-                if model.phase == .saved {
-                    resultPanel
-                        .transition(.scale(scale: 0.9).combined(with: .opacity))
-                }
             }
             .frame(width: outer.size.width, height: outer.size.height)
         }
         .animation(.snappy, value: model.phase)
+        // Coming back from the review: CompareView's onDisappear (portrait
+        // lock) may run after our own call, so allow landscape again here.
+        .onAppear {
+            OrientationLock.allowLandscape()
+            UIApplication.shared.isIdleTimerDisabled = true
+        }
     }
 
     // MARK: Camera + tutorial pictures
@@ -246,13 +264,9 @@ struct RecordView: View {
 
     private var controlsLayer: some View {
         VStack(spacing: 0) {
-            if model.phase != .saved {
-                topBar
-            }
+            topBar
             Spacer(minLength: 0)
-            if model.phase != .saved {
-                bottomControls
-            }
+            bottomControls
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -272,6 +286,15 @@ struct RecordView: View {
                     .accessibilityLabel("Close")
 
                     Spacer(minLength: 0)
+
+                    Button {
+                        countdownSound.toggle()
+                    } label: {
+                        Image(systemName: countdownSound ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                    }
+                    .buttonStyle(.round(size: 40))
+                    .accessibilityLabel("Countdown sound")
+                    .accessibilityValue(countdownSound ? "On" : "Off")
 
                     Button {
                         layout = (layout == .ghost) ? .sideBySide : .ghost
@@ -428,61 +451,6 @@ struct RecordView: View {
         }
     }
 
-    // MARK: Result panel
-
-    private var resultPanel: some View {
-        ZStack {
-            Color.black.opacity(0.45).ignoresSafeArea()
-
-            VStack(spacing: 14) {
-                VStack(spacing: 4) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(Color.green)
-                            .accessibilityHidden(true)
-                        Text("Saved")
-                            .foregroundStyle(Color.white)
-                    }
-                    .font(.system(.title3, design: .rounded).weight(.bold))
-
-                    Text("Your recording is saved in this project.")
-                        .font(.footnote)
-                        .foregroundStyle(Theme.secondaryText)
-                        .multilineTextAlignment(.center)
-                }
-
-                VStack(spacing: 10) {
-                    Button {
-                        model.finish(with: model.savedTake)
-                    } label: {
-                        Text("Compare")
-                    }
-                    .buttonStyle(RecordCapsuleButtonStyle(prominent: true))
-
-                    HStack(spacing: 10) {
-                        Button {
-                            model.recordAgain()
-                        } label: {
-                            Text("Record again")
-                        }
-                        .buttonStyle(RecordCapsuleButtonStyle())
-
-                        Button {
-                            model.finish(with: nil)
-                        } label: {
-                            Text("Done")
-                        }
-                        .buttonStyle(RecordCapsuleButtonStyle())
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .card(padding: 20)
-            .frame(maxWidth: 360)
-            .padding(16)
-        }
-    }
-
     // MARK: Permission denied
 
     private var permissionDeniedView: some View {
@@ -520,6 +488,19 @@ struct RecordView: View {
     }
 
     // MARK: - Actions & formatting
+
+    /// "Record again" in the review: back to the camera, ready for a new take.
+    private func recordAgainFromReview() {
+        model.recordAgain()
+        // The compare screen locks portrait when it goes away (a moment
+        // later than this call), so allow landscape again after that too.
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !model.hasEnded else { return }
+            OrientationLock.allowLandscape()
+            UIApplication.shared.isIdleTimerDisabled = true
+        }
+    }
 
     private func closeTapped() {
         switch model.phase {
@@ -613,7 +594,7 @@ private final class RecordSessionModel {
         case recording
         /// Stopped; waiting for the movie file to be finished.
         case finishing
-        /// Take saved; the result panel is shown.
+        /// Take saved; the instant replay (review) is shown.
         case saved
     }
 
@@ -621,8 +602,15 @@ private final class RecordSessionModel {
     /// (This is saved as the take's `takeOffset`.)
     nonisolated static let countdownSeconds: Double = 3.0
 
+    /// The top-bar speaker toggle (`@AppStorage("countdownSound")`, default on).
+    private static var countdownSoundEnabled: Bool {
+        UserDefaults.standard.object(forKey: "countdownSound") as? Bool ?? true
+    }
+
     let recorder = CameraRecorder()
     let tutorial = RecordTutorialPlayer()
+    /// Beeps of the 3-2-1.
+    private let sounds = CountdownSounds()
 
     private(set) var phase: Phase = .idle
     /// 3, 2, 1 while counting down, otherwise nil.
@@ -658,6 +646,12 @@ private final class RecordSessionModel {
     var canStop: Bool {
         phase == .countdown || phase == .recording
     }
+    /// True once the screen went away.
+    var hasEnded: Bool { isEnded }
+    /// The saved take while it is being reviewed (instant replay).
+    var reviewTake: Take? {
+        phase == .saved ? savedTake : nil
+    }
     var isLayoutLocked: Bool {
         phase == .starting || phase == .countdown || phase == .finishing
     }
@@ -686,6 +680,7 @@ private final class RecordSessionModel {
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
         try? AVAudioSession.sharedInstance().setActive(true)
 
+        sounds.preload()
         tutorial.prepare(url: project?.videoURL)
         await recorder.start()
     }
@@ -700,6 +695,7 @@ private final class RecordSessionModel {
         }
         countdownTask?.cancel()
         countdownTask = nil
+        sounds.cancel()
         tutorial.tearDown()
         recorder.stop()
     }
@@ -756,6 +752,13 @@ private final class RecordSessionModel {
 
         recordingStartSeconds = hostTime.seconds
         tutorial.startPlayback(atHostTime: tutorialHostTime)
+        // Beeps at 3, 2, 1 (and the "go" ding when the tutorial starts),
+        // scheduled on the audio clock relative to the camera's start time.
+        if Self.countdownSoundEnabled {
+            let hostNow = CMClockGetTime(CMClockGetHostTimeClock()).seconds
+            sounds.schedule(startingAt: hostTime.seconds - hostNow,
+                            interval: Self.countdownSeconds / 3)
+        }
         phase = .countdown
         runCountdown(until: tutorialHostTime.seconds)
     }
@@ -811,6 +814,7 @@ private final class RecordSessionModel {
     private func beginFinishing() {
         countdownTask?.cancel()
         countdownTask = nil
+        sounds.cancel()
         countdownValue = nil
         showGo = false
         // Stopped before the tutorial even started: nothing worth keeping.
@@ -849,6 +853,9 @@ private final class RecordSessionModel {
             )
             savedTake = take
             phase = .saved
+            // Reviewing: the camera is not needed (saves battery). The
+            // tutorial player stays loaded for "Record again".
+            recorder.stop()
 
         case .failure(let error):
             VideoStorage.deleteVideo(named: fileName)
@@ -865,11 +872,14 @@ private final class RecordSessionModel {
         tutorial.moveToStart()
     }
 
-    /// "Record again": the saved take stays; go back to the start.
+    /// "Record again" (from the review): the saved take stays; restart the
+    /// camera and go back to the start, ready for a new take.
     func recordAgain() {
+        guard phase == .saved, !isEnded else { return }
         savedTake = nil
         phase = .idle
         tutorial.moveToStart()
+        Task { await recorder.start() }
     }
 
     /// Close was confirmed in the "discard?" dialog.

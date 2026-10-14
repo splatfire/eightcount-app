@@ -299,8 +299,10 @@ How a practice session works in the code:
 2. Tap **⏺ (Record yourself)** at the top. Put the phone on a stand so your
    **whole body** is visible, then tap the red button. Recording starts, a
    3-2-1 countdown runs, then the tutorial and its music start.
-3. Tap Stop, or it stops by itself at the end of the loop or video. Then
-   tap **Compare**.
+3. Tap Stop, or it stops by itself at the end of the loop or video. **The
+   replay starts right away** (you + tutorial, with the music). Tap **Record
+   again** for another take. The countdown beeps 3-2-1 and dings when the
+   music starts (speaker button to turn it off).
 4. In Compare, turn the phone sideways for you (left) and the tutorial
    (right). Play, scrub, slow down, and switch to ghost overlay to see the
    differences.
@@ -437,8 +439,7 @@ Test these on the phone:
    exactly known, so this is expected.
 3. **Music while recording:** the tutorial's sound plays from the speaker
    and the recording has no sound.
-4. **After recording, "Compare" opens the compare screen.** If it ever
-   doesn't open, tell me and I'll add a short delay.
+4. **After recording, the replay starts by itself** (your take with the music).
 5. **Analysis:** try a short part (one or two 8-counts) first. It takes
    roughly 1–2 minutes per minute of video. Check that "late" or "early"
    matches what you see, and that left/right in the tips matches your own
