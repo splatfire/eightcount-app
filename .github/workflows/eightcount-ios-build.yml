@@ -142,6 +142,9 @@ jobs:
             2>&1 | tee build-test.log | grep -E "error:|TEST BUILD (SUCCEEDED|FAILED)" || true
           grep -q "TEST BUILD SUCCEEDED" build-test.log
 
+      - name: Allow saving to Photos in the simulator (for the export test)
+        run: xcrun simctl privacy "$UDID" grant photos-add io.github.splatfire.eightcount || true
+
       - name: Run UI test (one retry if the test runner fails to start)
         run: |
           mkdir -p shots

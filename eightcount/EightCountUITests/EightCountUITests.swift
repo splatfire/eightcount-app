@@ -142,6 +142,28 @@ final class EightCountUITests: XCTestCase {
             if closeCoach.exists { closeCoach.tap(); sleep(1) }
         }
 
+        // 7b. Save the take to Photos with the song (the TikTok export)
+        let saveVideo = app.buttons["Save video"].firstMatch
+        if saveVideo.waitForExistence(timeout: 5) {
+            saveVideo.tap()
+            let saveToPhotos = app.buttons["Save to Photos"].firstMatch
+            waitFor(saveToPhotos, 10)
+            sleep(1)
+            shot("10e-save-sheet")
+            saveToPhotos.tap()
+            // If iOS still asks for permission, allow it.
+            let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+            for label in ["Allow", "Allow Access", "OK"] {
+                let button = springboard.buttons[label]
+                if button.waitForExistence(timeout: 3) { button.tap(); break }
+            }
+            waitFor(app.staticTexts["Saved to Photos"].firstMatch, 180)
+            shot("10f-saved")
+            let done = app.buttons["Done"].firstMatch
+            if done.exists { done.tap() } else { app.swipeDown() }
+            sleep(1)
+        }
+
         // 8. AI analysis (the test video has no people in it, so it must end
         //    with a friendly error — the point is that nothing crashes).
         app.buttons["Analyze"].firstMatch.tap()
