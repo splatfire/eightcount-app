@@ -79,6 +79,12 @@ User asked for (subagents must use model "sonnet" to save tokens):
   1080p. UI test exports to the simulator's Photos ("Saved to Photos") — green (run for b8c9e66).
 - Fine-scrub ruler direction fixed (drag left = forward, ticks follow finger).
 
+- Instant replay: after a recording is saved, RecordView switches straight to CompareView(autoPlay) inside
+  the same cover, with "Record again". Compare autoplays on open and when a speed is picked.
+  Countdown beeps (Resources/Sounds/countdown-tick.wav ×3 + countdown-go.wav at music start, self-made, not
+  TikTok's file), toggle "Countdown sound". CI green incl. UI test asserting autoplay (run for 9d137e8).
+  Not testable in CI: camera recording → instant replay, and the beeps (need a real iPhone).
+
 ## Next step
 - User tests on device: camera recording, real analysis, Apple Intelligence tips; report any issues.
 - Free Apple ID: re-run `./setup-mac.sh --install --no-open` every 7 days.
