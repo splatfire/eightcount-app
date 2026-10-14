@@ -42,6 +42,7 @@ struct CompareView: View {
 
     @State private var showSync = false
     @State private var showAnalysis = false
+    @State private var showExport = false
 
     /// While the slider thumb is dragged we show this value instead of the
     /// real playhead, so updates don't fight your finger.
@@ -119,6 +120,9 @@ struct CompareView: View {
             OrientationLock.portraitOnly()
             playback.tearDown()
             try? modelContext.save()
+        }
+        .sheet(isPresented: $showExport) {
+            ExportTakeSheet(take: take, project: project)
         }
         .sheet(isPresented: $showAnalysis, onDismiss: {
             report = take.analysisReport
@@ -353,8 +357,8 @@ struct CompareView: View {
     // MARK: Top row (close, issues, mode, mirror, sync, analyze)
 
     private func topRow(landscape: Bool) -> some View {
-        GlassGroup(spacing: 10) {
-            HStack(spacing: 10) {
+        GlassGroup(spacing: 8) {
+            HStack(spacing: 8) {
                 Button {
                     dismiss()
                 } label: {
@@ -396,6 +400,15 @@ struct CompareView: View {
                     .presentationCompactAdaptation(.popover)
                     .preferredColorScheme(.dark)
                 }
+
+                Button {
+                    playback.pause()
+                    showExport = true
+                } label: {
+                    Image(systemName: "square.and.arrow.down")
+                }
+                .buttonStyle(.round(size: 40))
+                .accessibilityLabel("Save video")
 
                 Button {
                     showAnalysis = true

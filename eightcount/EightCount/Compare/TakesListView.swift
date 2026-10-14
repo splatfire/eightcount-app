@@ -15,6 +15,8 @@ struct TakesListView: View {
     /// The take the user swiped to delete (waiting for confirmation).
     @State private var takePendingDelete: Take?
     @State private var showDeleteConfirm = false
+    /// The take whose "Save video" sheet is open.
+    @State private var takeToExport: ExportTarget?
 
     init(project: Project, onOpen: @escaping (Take) -> Void, onRecordNew: @escaping () -> Void) {
         self.project = project
@@ -53,6 +55,9 @@ struct TakesListView: View {
                     }
                 }
             }
+            .sheet(item: $takeToExport) { target in
+                ExportTakeSheet(take: target.take, project: project)
+            }
             .confirmationDialog(
                 "Delete this recording?",
                 isPresented: $showDeleteConfirm,
@@ -86,7 +91,21 @@ struct TakesListView: View {
                 }
                 .buttonStyle(.plain)
                 .listRowBackground(Theme.surface)
+                .contextMenu {
+                    Button {
+                        takeToExport = ExportTarget(take: take)
+                    } label: {
+                        Label("Save to Photos", systemImage: "square.and.arrow.down")
+                    }
+                }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button {
+                        takeToExport = ExportTarget(take: take)
+                    } label: {
+                        Label("Save to Photos", systemImage: "square.and.arrow.down")
+                    }
+                    .tint(Theme.accent)
+
                     Button(role: .destructive) {
                         takePendingDelete = take
                         showDeleteConfirm = true
@@ -115,6 +134,13 @@ struct TakesListView: View {
             .frame(maxWidth: 300)
         }
     }
+}
+
+/// Wraps a take so `.sheet(item:)` has something `Identifiable`
+/// (`Take` has its own `id: UUID`, which would be confusing here).
+private struct ExportTarget: Identifiable {
+    let id = UUID()
+    let take: Take
 }
 
 // MARK: - One row
