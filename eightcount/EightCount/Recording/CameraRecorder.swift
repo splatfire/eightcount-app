@@ -258,7 +258,11 @@ final class CameraRecorder {
         session.beginConfiguration()
         defer { session.commitConfiguration() }
 
-        if session.canSetSessionPreset(.high) {
+        // Full HD (1920×1080) — the most TikTok/Instagram keep — falling back
+        // to the camera's "high" setting if a phone can't do it.
+        if session.canSetSessionPreset(.hd1920x1080) {
+            session.sessionPreset = .hd1920x1080
+        } else if session.canSetSessionPreset(.high) {
             session.sessionPreset = .high
         }
         // We never record sound, so the capture session must not touch the
