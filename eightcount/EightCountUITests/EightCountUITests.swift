@@ -104,9 +104,9 @@ final class EightCountUITests: XCTestCase {
 
         let close = app.buttons["Close"].firstMatch
         waitFor(close, 20)
-        sleep(2)
-        shot("08-compare")
-        app.buttons["Play"].firstMatch.tap()
+        // Autoplay: the replay must start by itself (button shows "Pause").
+        waitFor(app.buttons["Pause"].firstMatch, 15)
+        shot("08-compare-autoplay")
         sleep(3)
         shot("09-compare-playing")
 
