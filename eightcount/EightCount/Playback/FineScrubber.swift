@@ -36,8 +36,10 @@ struct FineScrubber: View {
         let spacing = pointsPerFrame
         let perMajor = ticksPerMajor
         let majorSpacing = spacing * CGFloat(perMajor)
-        // Shift the ticks with the playhead so they "follow" the finger.
-        let phase = CGFloat(frameIndex * Double(spacing)).truncatingRemainder(dividingBy: majorSpacing)
+        // Ticks move WITH your finger, like pulling a film strip: as time goes
+        // forward the ruler slides left (so the phase shrinks).
+        let rawPhase = CGFloat(-frameIndex * Double(spacing)).truncatingRemainder(dividingBy: majorSpacing)
+        let phase = rawPhase < 0 ? rawPhase + majorSpacing : rawPhase
         let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
         let frameText = "Frame \(Int(frameIndex.rounded()) + 1)"
         let touching = isTouching
@@ -132,7 +134,9 @@ struct FineScrubber: View {
                 let frames = Int((leftover / pointsPerFrame).rounded(.towardZero))
                 if frames != 0 {
                     leftover -= CGFloat(frames) * pointsPerFrame
-                    controller.stepFrames(frames)
+                    // Like a video editor's timeline: drag LEFT = forward in
+                    // time, drag RIGHT = back (the strip follows your finger).
+                    controller.stepFrames(-frames)
                 }
             }
             .onEnded { _ in
