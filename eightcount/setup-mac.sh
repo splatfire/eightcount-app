@@ -3,7 +3,10 @@
 #
 #   ./setup-mac.sh             generate the Xcode project, compile check, open Xcode
 #   ./setup-mac.sh --install   ...and build, sign, install and launch on your
-#                              iPhone (connected by cable, unlocked)
+#                              iPhone (cable, or Wi-Fi once paired; iPhone unlocked)
+#   ./setup-mac.sh --update    download the newest version from GitHub, then install
+#                              it on the iPhone (over Wi-Fi works too)
+#   ./setup-mac.sh --shortcut  put a double-clickable "Update EightCount" on your Desktop
 #
 # Options:
 #   --team ABCDE12345          your Apple Team ID (found automatically if possible)
@@ -19,10 +22,24 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-INSTALL=0; OPEN=1; TEAM_ID=""; BUNDLE_ID=""
+INSTALL=0; OPEN=1; UPDATE=0; TEAM_ID=""; BUNDLE_ID=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --install) INSTALL=1 ;;
+    --update) UPDATE=1; INSTALL=1; OPEN=0 ;;
+    --shortcut)
+      SHORTCUT="$HOME/Desktop/Update EightCount.command"
+      cat > "$SHORTCUT" <<SH
+#!/bin/bash
+# Double-click to download the newest EightCount and install it on your iPhone.
+"$(pwd)/setup-mac.sh" --update
+echo
+read -r -p "Done — press Return to close this window. "
+SH
+      chmod +x "$SHORTCUT"
+      echo "Created: $SHORTCUT"
+      echo "Double-click it whenever you want the newest version on your iPhone."
+      exit 0 ;;
     --no-open) OPEN=0 ;;
     --team) TEAM_ID="${2:-}"; shift ;;
     --bundle-id) BUNDLE_ID="${2:-}"; shift ;;
@@ -35,6 +52,30 @@ done
 
 step() { printf '\n\033[1;35m==> %s\033[0m\n' "$1"; }
 fail() { printf '\n\033[1;31m✗ %s\033[0m\n' "$1"; exit 1; }
+
+# Your personal settings (Team ID, bundle ID) live in this file, not in
+# project.yml, so downloading updates never clashes with your changes.
+LOCAL_SETTINGS=".eightcount-local"
+# shellcheck source=/dev/null
+[ -f "$LOCAL_SETTINGS" ] && . "./$LOCAL_SETTINGS"
+SAVED_TEAM="${SAVED_TEAM:-}"; SAVED_BUNDLE="${SAVED_BUNDLE:-}"
+save_settings() {
+  printf 'SAVED_TEAM="%s"\nSAVED_BUNDLE="%s"\n' "$SAVED_TEAM" "$SAVED_BUNDLE" > "$LOCAL_SETTINGS"
+}
+
+# Older versions of this script wrote the Team ID into project.yml. Move it
+# to the settings file and undo that local edit (otherwise `git pull` fails).
+OLD_TEAM=$(sed -nE 's/.*DEVELOPMENT_TEAM: "([A-Z0-9]{10})".*/\1/p' project.yml | head -1)
+if [ -n "$OLD_TEAM" ]; then
+  SAVED_TEAM="${SAVED_TEAM:-$OLD_TEAM}"
+  save_settings
+  git checkout -- project.yml 2>/dev/null || true
+fi
+
+if [ "$UPDATE" = 1 ]; then
+  step "Downloading the newest version"
+  git -C .. pull --autostash --ff-only || fail "Couldn't download the update (see the message above)."
+fi
 
 # ---------------------------------------------------------------- Xcode
 step "Checking Xcode"
@@ -74,22 +115,16 @@ find_team_id() {
     | sed -nE 's/.*teamID = "?([A-Z0-9]{10})"?;.*/\1/p' | head -1
 }
 
-if [ -z "$TEAM_ID" ]; then
-  TEAM_ID=$(sed -nE 's/.*DEVELOPMENT_TEAM: "([A-Z0-9]{10})".*/\1/p' project.yml | head -1)
-fi
+[ -z "$TEAM_ID" ] && TEAM_ID="$SAVED_TEAM"
 if [ -z "$TEAM_ID" ]; then
   TEAM_ID=$(find_team_id || true)
   [ -n "$TEAM_ID" ] && echo "Found your Team ID: $TEAM_ID"
 fi
-if [ -n "$TEAM_ID" ]; then
-  sed -i '' -E "s/DEVELOPMENT_TEAM: \"[^\"]*\"/DEVELOPMENT_TEAM: \"$TEAM_ID\"/" project.yml
-fi
-if [ -n "$BUNDLE_ID" ]; then
-  echo "Using bundle ID $BUNDLE_ID"
-  sed -i '' -E "s/PRODUCT_BUNDLE_IDENTIFIER: [^ ]+  # app bundle ID/PRODUCT_BUNDLE_IDENTIFIER: $BUNDLE_ID  # app bundle ID/" project.yml
-  sed -i '' -E "s/PRODUCT_BUNDLE_IDENTIFIER: [^ ]+\.uitests$/PRODUCT_BUNDLE_IDENTIFIER: $BUNDLE_ID.uitests/" project.yml
-fi
-APP_BUNDLE_ID=$(sed -nE 's/.*PRODUCT_BUNDLE_IDENTIFIER: ([^ ]+)  # app bundle ID.*/\1/p' project.yml)
+[ -z "$BUNDLE_ID" ] && BUNDLE_ID="$SAVED_BUNDLE"
+SAVED_TEAM="$TEAM_ID"; SAVED_BUNDLE="$BUNDLE_ID"; save_settings
+DEFAULT_BUNDLE_ID=$(sed -nE 's/.*PRODUCT_BUNDLE_IDENTIFIER: ([^ ]+)  # app bundle ID.*/\1/p' project.yml)
+APP_BUNDLE_ID="${BUNDLE_ID:-$DEFAULT_BUNDLE_ID}"
+[ -n "$BUNDLE_ID" ] && echo "Using your bundle ID $BUNDLE_ID"
 
 # ---------------------------------------------------------------- Project
 step "Generating EightCount.xcodeproj"
@@ -139,8 +174,9 @@ print("|".join(best) if best else "")
 PY
 )
   rm -f "$JSON"
-  [ -n "$DEVICE_INFO" ] || fail "No iPhone found. Connect it with a cable, unlock it and tap
-  \"Trust This Computer\". Then run this script again."
+  [ -n "$DEVICE_INFO" ] || fail "No iPhone found. Unlock it and make sure it's on the same Wi-Fi as
+  this Mac (or connect the cable). The very first time it must be connected by
+  cable and you tap \"Trust This Computer\". Then run this script again."
   IFS='|' read -r DEVICE_ID DEVICE_UDID DEVICE_NAME PAIRING DEVMODE _ <<< "$DEVICE_INFO"
   echo "Found: $DEVICE_NAME ($DEVICE_UDID) — pairing: ${PAIRING:-?}, developer mode: ${DEVMODE:-?}"
   [ "$PAIRING" = "paired" ] || fail "The iPhone isn't paired yet. Unlock it, tap \"Trust\", enter
@@ -155,7 +191,8 @@ PY
        -configuration Debug -destination "platform=iOS,id=$DEVICE_UDID" \
        -derivedDataPath build/device \
        -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
-       DEVELOPMENT_TEAM="$TEAM_ID" > device-build.log 2>&1; then
+       DEVELOPMENT_TEAM="$TEAM_ID" PRODUCT_BUNDLE_IDENTIFIER="$APP_BUNDLE_ID" \
+       > device-build.log 2>&1; then
     echo "Signing/build failed:"
     grep -E "error:" device-build.log | sort -u | head -20 || tail -40 device-build.log
     if grep -qiE "bundle identifier|App ID|is not available" device-build.log; then
@@ -184,9 +221,9 @@ PY
     echo "Then tap the EightCount icon on your home screen."
   fi
   echo
-  echo "Free Apple ID: the app stops opening after 7 days — just run"
-  echo "  ./setup-mac.sh --install --no-open"
-  echo "again with the iPhone connected. Your projects and notes stay."
+  echo "Free Apple ID: the app stops opening after 7 days — run the update again"
+  echo "(double-click \"Update EightCount\" on the Desktop, or ./setup-mac.sh --update)."
+  echo "Wi-Fi is enough; your projects and notes stay."
 fi
 
 # ---------------------------------------------------------------- Xcode

@@ -150,6 +150,55 @@ window to put it into its Photos app.
 
 ---
 
+### 1.7 Updates without the cable
+
+**Now (free Apple ID): over Wi-Fi from your Mac**
+
+1. One time, run this to put an **"Update EightCount"** icon on your
+   Desktop:
+   ```sh
+   ~/splatfire/eightcount/setup-mac.sh --shortcut
+   ```
+2. From then on, **double-click "Update EightCount"**. It downloads my newest
+   changes and installs them on your iPhone **over Wi-Fi**. The iPhone must
+   be unlocked and on the same Wi-Fi as the Mac. It only needs the cable if
+   the iPhone has never been paired.
+3. Do the same at least every 7 days. With a free Apple ID, apps stop
+   opening after 7 days, and the update restarts that clock. Your projects
+   stay.
+
+**Later (paid Apple Developer Program, 99 USD/EUR per year): TestFlight, no Mac at all**
+
+Everything is prepared in `.github/workflows/eightcount-testflight.yml`.
+After this one-time setup, every change is built by GitHub and appears in
+the **TestFlight** app on your iPhone. You tap **Update**, with no Mac and no
+7-day expiry (each build lasts 90 days).
+
+1. Enrol at <https://developer.apple.com/programs/enroll/>.
+2. In <https://appstoreconnect.apple.com>, go to **Apps → + → New App** and
+   choose iOS, the name "EightCount" (or any name) and the bundle ID
+   `io.github.splatfire.eightcount`. If the bundle ID isn't in the list,
+   create it first under developer.apple.com → Certificates, IDs & Profiles
+   → Identifiers.
+3. Go to **Users and Access → Integrations → App Store Connect API → +**.
+   Give the key **Admin** access, because it has to create the
+   distribution certificate. Download the `.p8` file (it can only be
+   downloaded once) and note the **Key ID** and **Issuer ID**.
+4. On GitHub, open the repo → **Settings → Secrets and variables → Actions
+   → New repository secret** and add these 4 secrets:
+   - `ASC_KEY_ID`: the Key ID
+   - `ASC_ISSUER_ID`: the Issuer ID
+   - `ASC_KEY_P8_BASE64`: run `base64 -i ~/Downloads/AuthKey_XXXX.p8 | pbcopy`
+     in Terminal, then paste
+   - `APPLE_TEAM_ID`: your Team ID (developer.apple.com → Membership)
+5. On GitHub: **Actions → EightCount TestFlight → Run workflow**. After
+   about 15 minutes plus Apple's processing, the build appears in App Store
+   Connect → TestFlight. Add yourself under **Internal Testing**, then
+   install the **TestFlight** app on the iPhone and accept the invite.
+
+Not tested yet: GitHub can't run this without your paid account's keys.
+If the first run fails, send me the error from the Actions tab.
+
 ## 2. Free Apple ID vs. paid Apple Developer Program
 
 | | Free Apple ID (Personal Team) | Paid Developer Program (99 USD/year) |

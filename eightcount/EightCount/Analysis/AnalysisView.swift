@@ -227,18 +227,25 @@ struct AnalysisView: View {
     }
 
     var body: some View {
-        ZStack {
-            Theme.background.ignoresSafeArea()
+        // The header stays fixed at the top; only the results scroll under it,
+        // so nothing gets cut off at the sheet's top edge.
+        VStack(spacing: 0) {
+            header
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 10)
+            Divider().overlay(Theme.hairline)
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    header
                     content
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .padding(.top, 14)
                 .padding(.bottom, 24)
             }
         }
+        .presentationBackground(Theme.background)
+        .presentationDragIndicator(.visible)
         .preferredColorScheme(.dark)
         // Leaving the sheet stops a running analysis.
         .onDisappear { runner.cancel() }

@@ -128,15 +128,20 @@ struct CompareView: View {
                 take: take,
                 tutorialMirrored: mirrorTutorial,
                 takeMirrored: mirrorMe,
-                onJump: { time in playback.seek(to: time) },
+                onJump: { time in
+                    showAnalysis = false   // show the moment, not the sheet
+                    playback.seek(to: time)
+                },
                 onCoach: { findings, index in
                     showAnalysis = false
                     report = take.analysisReport
                     enterCoach(findings, at: index)
                 }
             )
-            .presentationDetents([.medium, .large])
-            .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+            // Full height: issues are shown on the video itself (coach mode),
+            // so the sheet doesn't need to share the screen. (Half-height sheets
+            // float with inset rounded corners on iOS 26+, which looked misaligned.)
+            .presentationDetents([.large])
         }
     }
 
