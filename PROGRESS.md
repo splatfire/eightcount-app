@@ -67,6 +67,13 @@ User asked for (subagents must use model "sonnet" to save tokens):
   video", numbered Top fixes). CI green incl. UI test with ghost/coach screenshots (run 38460974176).
 - Not verifiable in CI: skeleton drawing on a real person (test video has no person).
 
+- Updates without cable (user chose "Wi-Fi now, TestFlight later"): `setup-mac.sh --update` (git pull +
+  install, works over Wi-Fi) and `--shortcut` (Desktop "Update EightCount.command"); Team/bundle ID now in
+  gitignored `eightcount/.eightcount-local` (script migrates the old project.yml edit). TestFlight workflow
+  `.github/workflows/eightcount-testflight.yml` skips until secrets ASC_KEY_ID / ASC_ISSUER_ID /
+  ASC_KEY_P8_BASE64 / APPLE_TEAM_ID exist (needs paid membership; untested until then).
+- Analysis sheet: full height + fixed header (iOS 26 half-height sheets float with inset corners → looked misaligned).
+
 ## Next step
 - User tests on device: camera recording, real analysis, Apple Intelligence tips; report any issues.
 - Free Apple ID: re-run `./setup-mac.sh --install --no-open` every 7 days.
