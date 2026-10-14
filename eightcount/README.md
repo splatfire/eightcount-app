@@ -315,6 +315,15 @@ How a practice session works in the code:
    see-through over you and lined up with your body automatically. Drag or
    pinch to adjust it.
 8. All recordings are under ⋯ → **My Takes**.
+9. **Post it:** in the compare screen, tap **⤓ Save video** (or swipe a take
+   in My Takes) and choose one:
+   - **Me with the song** (for TikTok): your recording with the tutorial's
+     music, starting on the music, at real tempo even if you practiced
+     slower.
+   - **Me + tutorial**: a vertical 9:16 video, you on top and the tutorial
+     below.
+   - **Original recording**: the untouched file, without sound.
+   It's saved to Photos in Full HD (1080p, TikTok's maximum).
 
 How the AI analysis works: Apple's Vision framework finds 15 body points
 (shoulders, elbows, wrists, hips, knees, ankles…) in about 10 frames per

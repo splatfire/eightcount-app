@@ -74,6 +74,11 @@ User asked for (subagents must use model "sonnet" to save tokens):
   ASC_KEY_P8_BASE64 / APPLE_TEAM_ID exist (needs paid membership; untested until then).
 - Analysis sheet: full height + fixed header (iOS 26 half-height sheets float with inset corners → looked misaligned).
 
+- Save to Photos (TikTok): Services/TakeExporter.swift + Compare/ExportTakeSheet.swift — me with the song
+  (synced tutorial audio, real tempo, optional mirror), me + tutorial 9:16, original. Recording now explicit
+  1080p. UI test exports to the simulator's Photos ("Saved to Photos") — green (run for b8c9e66).
+- Fine-scrub ruler direction fixed (drag left = forward, ticks follow finger).
+
 ## Next step
 - User tests on device: camera recording, real analysis, Apple Intelligence tips; report any issues.
 - Free Apple ID: re-run `./setup-mac.sh --install --no-open` every 7 days.
