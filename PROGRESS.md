@@ -85,6 +85,9 @@ User asked for (subagents must use model "sonnet" to save tokens):
   TikTok's file), toggle "Countdown sound". CI green incl. UI test asserting autoplay (run for 9d137e8).
   Not testable in CI: camera recording → instant replay, and the beeps (need a real iPhone).
 
+- Decision (user): stay on the FREE Apple ID for now (no paid membership, no TestFlight/App Store).
+  Updates via Desktop "Update EightCount" (Wi-Fi), at least every 7 days. TestFlight workflow stays dormant.
+
 ## Next step
 - User tests on device: camera recording, real analysis, Apple Intelligence tips; report any issues.
 - Free Apple ID: re-run `./setup-mac.sh --install --no-open` every 7 days.
