@@ -115,6 +115,7 @@ final class EightCountUITests: XCTestCase {
         let close = app.buttons["Close"].firstMatch
         waitFor(close, 20)
         // Autoplay: the replay must start by itself (button shows "Pause").
+        // Compare opens in ghost mode (tutorial see-through over you, auto-aligned).
         waitFor(app.buttons["Pause"].firstMatch, 15)
         shot("08-compare-autoplay")
         sleep(3)
@@ -126,14 +127,12 @@ final class EightCountUITests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
         sleep(2)
 
-        // Ghost mode (tutorial see-through over you, auto-aligned)
-        let ghost = app.buttons["Ghost"].firstMatch
-        if ghost.waitForExistence(timeout: 5) {
-            ghost.tap()
-            sleep(3)
-            shot("10b-ghost")
-            app.buttons["Side by side"].firstMatch.tap()
-            sleep(1)
+        // Switch to side by side (coach mode below is shot in this layout)
+        let sideBySide = app.buttons["Side by side"].firstMatch
+        if sideBySide.waitForExistence(timeout: 5) {
+            sideBySide.tap()
+            sleep(2)
+            shot("10b-side-by-side")
         }
 
         // Coach mode from the saved (seeded) analysis: issue shown on the video

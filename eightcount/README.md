@@ -17,8 +17,8 @@ tutorial and dance-practice videos:
 - **Export / import** a project's notes and snapshots (not the video) as one
   file, so you can back them up or send them to someone in your group.
 - **Record yourself** with the front camera while the tutorial plays. You see
-  yourself live next to the tutorial, or the tutorial as a see-through
-  "ghost" over your camera image. The camera records video only; the music
+  the tutorial as a see-through "ghost" over your camera image (default), or
+  yourself live next to the tutorial. The camera records video only; the music
   comes from the tutorial.
 - **Compare**: your take and the tutorial play in sync with the tutorial's
   music. Turn the phone sideways for **you on the left and the tutorial on
@@ -314,9 +314,9 @@ How a practice session works in the code:
    replay starts right away** (you + tutorial, with the music). Tap **Record
    again** for another take. The countdown beeps 3-2-1 and dings when the
    music starts (speaker button to turn it off).
-4. In Compare, turn the phone sideways for you (left) and the tutorial
-   (right). Play, scrub, slow down, and switch to ghost overlay to see the
-   differences.
+4. Compare opens in **Ghost**: the tutorial is laid see-through over you.
+   Tap **Side by side** for two videos; turn the phone sideways for you
+   (left) and the tutorial (right). Play, scrub and slow down in both.
 5. If your video looks a bit early or late even though you danced on the
    beat, use **Sync** to nudge it by a frame or 0.1 s.
 6. Tap **✨ Analyze** for the AI feedback, then **Show me on the video**. The
@@ -324,9 +324,8 @@ How a practice session works in the code:
    tutorial with the problem limb in red, and you step through the issues
    with ‹ ›. **Replay** plays that moment slowly. Red dots on the timeline
    mark every issue.
-7. Switch to **Ghost** for a one-to-one comparison. The tutorial is laid
-   see-through over you and lined up with your body automatically. Drag or
-   pinch to adjust it.
+7. In **Ghost** the tutorial is lined up with your body automatically. Drag
+   or pinch to adjust it.
 8. All recordings are under ⋯ → **My Takes**.
 9. **Post it:** in the compare screen, tap **⤓ Save video** (or swipe a take
    in My Takes) and choose one:
@@ -505,6 +504,8 @@ Change any of them later.
 **Look & layout**
 - **Always dark** (`UIUserInterfaceStyle = Dark`), coral-pink accent, light-blue
   for anything loop-related.
+- **Ghost is the default layout** in Record and Compare (you asked for it:
+  it is the more useful view). Side by side is one tap away.
 - **Portrait for practice, landscape allowed for record and compare.** The
   practice screen stays portrait-only. Turning sideways is mainly useful
   for side by side.

@@ -35,8 +35,8 @@ struct CompareView: View {
 
     @State private var playback: SyncedPlayback
 
-    /// true = two videos next to each other, false = ghost overlay.
-    @State private var isSideBySide = true
+    /// true = two videos next to each other, false = ghost overlay (default).
+    @State private var isSideBySide = false
     /// Your video is flipped by default, like looking in a mirror.
     /// (The recorded file itself is NOT mirrored.)
     @State private var mirrorMe = true
@@ -496,14 +496,14 @@ struct CompareView: View {
         .accessibilityLabel("Mirror options")
     }
 
-    /// "Side by side" | "Ghost".
+    /// "Ghost" | "Side by side".
     private var modePicker: some View {
         PillPicker<Bool>(
             options: [
-                PillPicker<Bool>.Option(value: true, title: "Side by side",
-                                        accessibilityLabel: "Side by side"),
                 PillPicker<Bool>.Option(value: false, title: "Ghost",
-                                        accessibilityLabel: "Ghost")
+                                        accessibilityLabel: "Ghost"),
+                PillPicker<Bool>.Option(value: true, title: "Side by side",
+                                        accessibilityLabel: "Side by side")
             ],
             selection: isSideBySide,
             onSelect: { newValue in

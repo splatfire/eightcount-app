@@ -29,7 +29,7 @@ struct RecordView: View {
 
     /// Does all the work (camera, tutorial player, record flow).
     @State private var model = RecordSessionModel()
-    @State private var layout: RecordLayout = .sideBySide
+    @State private var layout: RecordLayout = .ghost
     @State private var ghostOpacity = 0.45
     @State private var showDiscardDialog = false
     /// Beeps with the 3-2-1 (also read by the record flow from UserDefaults).
