@@ -88,9 +88,11 @@ jobs:
           test $code -ne 0 && grep -qE "No Apple Team found|No iPhone found" install.log
       - name: Background refresh mode without an iPhone must stop quietly (exit 0)
         run: |
+          set +e
           printf 'SAVED_TEAM="ABCDE12345"\nSAVED_BUNDLE=""\n' > .eightcount-local
-          ./setup-mac.sh --refresh > refresh.log 2>&1; code=$?
-          tail -15 refresh.log
+          bash -x ./setup-mac.sh --refresh > refresh.log 2>&1; code=$?
+          echo "exit code: $code"
+          tail -60 refresh.log
           test $code -eq 0 && grep -q "No iPhone found" refresh.log
       - name: Auto-refresh agent file is valid
         run: |
