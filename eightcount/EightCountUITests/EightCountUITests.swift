@@ -187,7 +187,14 @@ final class EightCountUITests: XCTestCase {
         (again.exists ? again : first).tap()
         // The test video has no person in it, so a real run must end with the
         // friendly error — the point is that nothing crashes.
-        waitFor(app.staticTexts["That didn't work"].firstMatch, 240)
+        // Check only every 10 s: while Vision is busy, the Simulator can time
+        // out reading the screen, and each check is one more chance of that.
+        let failedText = app.staticTexts["That didn't work"].firstMatch
+        let deadline = Date().addingTimeInterval(240)
+        repeat {
+            sleep(10)
+        } while !failedText.exists && Date() < deadline
+        XCTAssertTrue(failedText.exists, "Analysis didn't end with the friendly error")
         shot("12-analysis-done")
     }
 }
