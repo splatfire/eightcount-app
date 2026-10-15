@@ -12,6 +12,8 @@ struct EightCountApp: App {
         // `.playback` makes the video's sound play even when the ring/silent
         // switch is on — important in a practice room.
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+        // Lets the Apple Watch app control playback (if there is a watch).
+        WatchRemote.shared.activate()
     }
 
     var body: some Scene {

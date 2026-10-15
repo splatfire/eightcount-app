@@ -78,6 +78,8 @@ struct CompareView: View {
     @State private var isReplaying = false
     @State private var replayTask: Task<Void, Never>? = nil
     @State private var replayRestore: CompareReplayRestore? = nil
+    /// Identifies this screen to the Apple Watch remote.
+    @State private var watchID = UUID()
 
     init(project: Project, take: Take, tutorialMirrored: Bool,
          autoPlay: Bool = true, onRecordAgain: (() -> Void)? = nil) {
@@ -115,6 +117,7 @@ struct CompareView: View {
         .onAppear {
             OrientationLock.allowLandscape()
             SyncedPlayback.activateAudioSession()
+            WatchRemoteHandlers.attachCompare(id: watchID, project: project, playback: playback)
         }
         .task {
             await playback.load()
@@ -127,6 +130,7 @@ struct CompareView: View {
             await loadCoachPoses()
         }
         .onDisappear {
+            WatchRemote.shared.detach(id: watchID)
             cancelReplay()
             OrientationLock.portraitOnly()
             playback.tearDown()

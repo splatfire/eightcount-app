@@ -180,6 +180,13 @@ fi
 xcodebuild -version
 # First-launch tasks (license, components). Harmless if already done.
 xcodebuild -runFirstLaunch >/dev/null 2>&1 || true
+# The Apple Watch app needs Xcode's watchOS support (a one-time download of
+# a few GB if it isn't installed yet).
+if ! xcodebuild -showsdks 2>/dev/null | grep -qi watchos; then
+  step "Downloading Xcode's watchOS support (one time, can take a while)"
+  xcodebuild -downloadPlatform watchOS || fail "Couldn't download watchOS support. Open Xcode →
+  Settings → Components (or Platforms) → watchOS → Get, then run this script again."
+fi
 
 # ---------------------------------------------------------------- XcodeGen
 step "Checking XcodeGen"
@@ -214,7 +221,7 @@ if [ -z "$TEAM_ID" ]; then
 fi
 [ -z "$BUNDLE_ID" ] && BUNDLE_ID="$SAVED_BUNDLE"
 SAVED_TEAM="$TEAM_ID"; SAVED_BUNDLE="$BUNDLE_ID"; save_settings
-DEFAULT_BUNDLE_ID=$(sed -nE 's/.*PRODUCT_BUNDLE_IDENTIFIER: ([^ ]+)  # app bundle ID.*/\1/p' project.yml)
+DEFAULT_BUNDLE_ID=$(sed -nE 's/.*EC_APP_BUNDLE_ID: ([^ ]+)  # app bundle ID.*/\1/p' project.yml)
 APP_BUNDLE_ID="${BUNDLE_ID:-$DEFAULT_BUNDLE_ID}"
 [ -n "$BUNDLE_ID" ] && echo "Using your bundle ID $BUNDLE_ID"
 
@@ -311,7 +318,7 @@ print(d.get("Entitlements", {}).get("application-identifier", "-"),
        -configuration Debug -destination "platform=iOS,id=$DEVICE_UDID" \
        -derivedDataPath build/device \
        -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
-       DEVELOPMENT_TEAM="$TEAM_ID" PRODUCT_BUNDLE_IDENTIFIER="$APP_BUNDLE_ID" \
+       DEVELOPMENT_TEAM="$TEAM_ID" EC_APP_BUNDLE_ID="$APP_BUNDLE_ID" \
        > device-build.log 2>&1; then
     echo "Signing/build failed:"
     grep -E "error:" device-build.log | sort -u | head -20 || tail -40 device-build.log

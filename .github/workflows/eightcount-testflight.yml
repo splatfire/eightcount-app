@@ -64,7 +64,7 @@ jobs:
           KEY="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
           echo "$ASC_KEY_P8_BASE64" | base64 --decode > "$KEY"
           EXTRA=()
-          [ -n "$APP_BUNDLE_ID" ] && EXTRA+=("PRODUCT_BUNDLE_IDENTIFIER=$APP_BUNDLE_ID")
+          [ -n "$APP_BUNDLE_ID" ] && EXTRA+=("EC_APP_BUNDLE_ID=$APP_BUNDLE_ID")
           xcodebuild archive \
             -project EightCount.xcodeproj -scheme EightCount -configuration Release \
             -destination 'generic/platform=iOS' -archivePath build/EightCount.xcarchive \

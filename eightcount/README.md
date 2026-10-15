@@ -28,6 +28,9 @@ tutorial and dance-practice videos:
   Intelligence then writes tips on what to work on.
 - **Liquid Glass** design on iOS 26 and newer (including iOS 27), with a
   normal look on older iOS.
+- **Apple Watch remote** (watchOS 10+): play/pause, back/next 8-count,
+  speed (also with the Digital Crown) and loop from your wrist, plus which
+  8-count is playing. See 1.8.
 
 Everything stays on your iPhone: no accounts, no servers, no analytics. The AI
 analysis runs on the device too.
@@ -118,8 +121,8 @@ Run `xcodegen generate` again whenever files are added or removed or
    registered to your development team"*, that app ID is already taken by
    someone else. Change **Bundle Identifier** to something unique, such as
    `com.yourname.eightcount`. Then put the same value into
-   `PRODUCT_BUNDLE_IDENTIFIER` in `project.yml`, so it survives the next
-   regenerate.
+   `EC_APP_BUNDLE_ID` in `project.yml`, so it survives the next
+   regenerate (the watch app automatically gets that ID + `.watchkitapp`).
 
 **So you don't have to pick the team after every `xcodegen generate`:** after
 step 3, go to the **Build Settings** tab, search for "Development Team", and
@@ -210,6 +213,30 @@ the **TestFlight** app on your iPhone. You tap **Update**, with no Mac and no
 Not tested yet: GitHub can't run this without your paid account's keys.
 If the first run fails, send me the error from the Actions tab.
 
+### 1.8 Apple Watch remote
+
+The watch app is a remote control for the iPhone app, so you don't have to
+walk to the phone on its stand. It shows which 8-count is playing and has:
+**play/pause**, **back / next 8-count**, **speed** (tap it, or turn the
+Digital Crown) and **loop** (loops the 8-count that's playing). It controls
+whatever is open on the iPhone: the practice screen or the compare screen.
+While you're recording, the watch buttons do nothing.
+
+It needs watchOS 10 or newer and is installed **together with the iPhone
+app** (same update command as above). Then:
+
+1. On the iPhone, open the **Watch** app. Scroll down to **Available Apps**
+   and tap **Install** next to EightCount (or switch on *Automatic App
+   Install* there once).
+2. If the watch says the developer isn't trusted or needs **Developer Mode**:
+   on the watch go to **Settings → Privacy & Security → Developer Mode**,
+   turn it on and restart the watch.
+3. Open EightCount on the iPhone, then on the watch. The iPhone app has to
+   be open for the buttons to work.
+
+With a free Apple ID the watch app also stops opening after 7 days, the
+same as the iPhone app.
+
 ## 2. Free Apple ID vs. paid Apple Developer Program
 
 | | Free Apple ID (Personal Team) | Paid Developer Program (99 USD/year) |
@@ -287,7 +314,15 @@ eightcount/
     ├── Services/                       VideoStorage, PhotosPicker transfer, FrameGrabber
     ├── Design/                         Theme (colors, big buttons), Glass (Liquid Glass)
     └── Resources/                      Info.plist, Assets.xcassets (icon, colors)
+├── EightCountWatch/                    Apple Watch remote (RemoteView, PhoneLink)
+└── Shared/WatchProtocol.swift          the messages iPhone and watch send each other
 ```
+
+The watch talks to the iPhone with WatchConnectivity. The iPhone side is
+`Services/WatchRemote.swift`: each controllable screen registers itself
+while it's open, and twice a second the iPhone sends the watch the new
+state if something changed (`Services/WatchRemoteHandlers.swift` says what
+each button does on each screen).
 
 How a practice session works in the code:
 
@@ -352,6 +387,17 @@ facial expression or energy.
 ---
 
 ## 5. Check on Mac (what I'm not 100 % sure about)
+
+**Apple Watch remote (new, not tried on a real watch yet):**
+- Whether a **free Apple ID** signs and installs the watch app without
+  problems. It needs one more app ID (free accounts get 10 per week), and
+  Xcode has to register the watch. If signing fails, send me the error from
+  `device-build.log`.
+- Whether the **auto-refresh** also renews the watch app on the watch, or
+  only the iPhone app. If the watch app stops opening after 7 days while the
+  iPhone app keeps working, tell me.
+- How fast the buttons react. They should feel almost instant while both
+  apps are open.
 
 **Verified on GitHub's Macs** (workflow `.github/workflows/eightcount-ios-build.yml`,
 runs after every change, results under the repo's **Actions** tab):

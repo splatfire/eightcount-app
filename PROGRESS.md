@@ -94,6 +94,13 @@ User asked for (subagents must use model "sonnet" to save tokens):
   within 4 days (to force a fresh 7-day profile — UNVERIFIED whether Xcode then issues a new one),
   builds, installs over Wi-Fi, notifications via osascript. Needs a week of real use to confirm.
 
+- Apple Watch remote (user picked "remote control" only; watch: Series 6–8/SE 2/Ultra 1 → watchOS 10):
+  target EightCountWatch (single-target watchOS app embedded in the iOS app), Shared/WatchProtocol.swift
+  (RemoteCommand/RemoteState dictionaries), iPhone side Services/WatchRemote.swift (WCSession, handler
+  stack, 0.5 s change-push) + WatchRemoteHandlers.swift (practice, compare, recording = blocked).
+  Bundle ID now comes from EC_APP_BUNDLE_ID (watch = +.watchkitapp); setup-mac.sh passes EC_APP_BUNDLE_ID
+  and downloads the watchOS platform if missing. Not tried on a real watch (free-account signing!).
+
 ## Next step
 - User tests on device: camera recording, real analysis, Apple Intelligence tips; report any issues.
 - Free Apple ID: re-run `./setup-mac.sh --install --no-open` every 7 days.

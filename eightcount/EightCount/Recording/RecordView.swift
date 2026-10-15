@@ -32,6 +32,8 @@ struct RecordView: View {
     @State private var layout: RecordLayout = .ghost
     @State private var ghostOpacity = 0.45
     @State private var showDiscardDialog = false
+    /// Identifies this screen to the Apple Watch remote (which pauses while recording).
+    @State private var watchID = UUID()
     /// Beeps with the 3-2-1 (also read by the record flow from UserDefaults).
     @AppStorage("countdownSound") private var countdownSound = true
 
@@ -72,6 +74,8 @@ struct RecordView: View {
         .onAppear {
             OrientationLock.allowLandscape()
             UIApplication.shared.isIdleTimerDisabled = true
+            WatchRemoteHandlers.attachBlocked(id: watchID, title: project.title,
+                                              message: "Recording – use your iPhone.")
         }
         .task {
             model.setUp(project: project, startTime: startTime, endTime: endTime, rate: rate,
@@ -79,6 +83,7 @@ struct RecordView: View {
             await model.begin()
         }
         .onDisappear {
+            WatchRemote.shared.detach(id: watchID)
             model.end()
             OrientationLock.portraitOnly()
             UIApplication.shared.isIdleTimerDisabled = false

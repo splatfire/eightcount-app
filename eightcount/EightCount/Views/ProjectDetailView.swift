@@ -36,6 +36,8 @@ struct ProjectDetailView: View {
     /// Which video file the player has loaded, so coming back from the
     /// record/compare screens doesn't reload it (and lose your place).
     @State private var loadedFileName: String?
+    /// Identifies this screen to the Apple Watch remote.
+    @State private var watchID = UUID()
 
     /// The 8-count layout for the current BPM / offset / video length.
     private var grid: CountGrid {
@@ -66,7 +68,13 @@ struct ProjectDetailView: View {
             loadedFileName = project.videoFileName
             await controller.load(url: url)
         }
-        .onDisappear { controller.tearDown() }
+        .onAppear {
+            WatchRemoteHandlers.attachPractice(id: watchID, project: project, controller: controller)
+        }
+        .onDisappear {
+            WatchRemote.shared.detach(id: watchID)
+            controller.tearDown()
+        }
         .sheet(item: $editing) { target in
             NoteEditorSheet(project: project, countIndex: target.id, grid: grid)
         }
