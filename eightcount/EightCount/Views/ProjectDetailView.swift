@@ -75,6 +75,7 @@ struct ProjectDetailView: View {
         .sheet(isPresented: $showTakes, onDismiss: runPendingActions) {
             TakesListView(
                 project: project,
+                tutorialMirrored: controller.isMirrored,
                 onOpen: { take in
                     pendingCompare = take
                     showTakes = false

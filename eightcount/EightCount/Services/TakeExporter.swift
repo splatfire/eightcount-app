@@ -31,7 +31,8 @@ enum TakeExportKind: Sendable {
     /// Your video + the tutorial's audio.
     case meWithSong(realTempo: Bool, mirrored: Bool)
     /// 1080x1920: you on top, the tutorial at the bottom, with the tutorial's audio.
-    case sideBySide(realTempo: Bool)
+    /// Each video can be flipped left-right (like the compare screen shows them).
+    case sideBySide(realTempo: Bool, mirrorMe: Bool, mirrorTutorial: Bool)
     /// The raw recording, saved as it is.
     case original
 
@@ -185,9 +186,11 @@ enum TakeExporter {
         let sideBySide: Bool
         let realTempo: Bool
         let mirrored: Bool
+        var mirrorTutorial = false
         switch kind {
         case .meWithSong(let r, let m): sideBySide = false; realTempo = r; mirrored = m
-        case .sideBySide(let r): sideBySide = true; realTempo = r; mirrored = false
+        case .sideBySide(let r, let me, let tutorial):
+            sideBySide = true; realTempo = r; mirrored = me; mirrorTutorial = tutorial
         case .original: throw TakeExportError.missingTutorial   // handled by the caller
         }
 
@@ -278,10 +281,15 @@ enum TakeExporter {
             let tutorialInfo = try await orientedInfo(of: tutorialVideo)
             let top = CGRect(x: 0, y: 0, width: 1080, height: 960)
             let bottom = CGRect(x: 0, y: 960, width: 1080, height: 960)
-            takeLayer.setTransform(takeInfo.transform.concatenating(fit(takeInfo.size, into: top)), at: .zero)
+            // Left-right flip across the frame; both videos are centered, so they stay in place.
+            let flip = CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: renderSize.width, ty: 0)
+            var takeTransform = takeInfo.transform.concatenating(fit(takeInfo.size, into: top))
+            if mirrored { takeTransform = takeTransform.concatenating(flip) }
+            takeLayer.setTransform(takeTransform, at: .zero)
             let tutorialLayer = AVMutableVideoCompositionLayerInstruction(assetTrack: compTutorialVideo)
-            tutorialLayer.setTransform(tutorialInfo.transform.concatenating(fit(tutorialInfo.size, into: bottom)),
-                                       at: .zero)
+            var tutorialTransform = tutorialInfo.transform.concatenating(fit(tutorialInfo.size, into: bottom))
+            if mirrorTutorial { tutorialTransform = tutorialTransform.concatenating(flip) }
+            tutorialLayer.setTransform(tutorialTransform, at: .zero)
             instruction.layerInstructions = [takeLayer, tutorialLayer]
         } else {
             renderSize = CGSize(width: max(takeInfo.size.width, 2), height: max(takeInfo.size.height, 2))

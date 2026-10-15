@@ -335,7 +335,8 @@ How a practice session works in the code:
      music, starting on the music, at real tempo even if you practiced
      slower.
    - **Me + tutorial**: a vertical 9:16 video, you on top and the tutorial
-     below.
+     below. It is flipped the same way as the compare screen (Mirror me /
+     Mirror tutorial), so the saved video lines up like what you compared.
    - **Original recording**: the untouched file, without sound.
    It's saved to Photos in Full HD (1080p, TikTok's maximum).
 
@@ -592,7 +593,9 @@ Change any of them later.
   your video by ±1 frame or ±0.1 s. The nudge is saved with the take.
 - **The recorded file is not mirrored** (it's how others see you). The
   compare screen shows it **mirrored by default**, like a mirror, and you
-  can switch that off.
+  can switch that off. **"Me + tutorial" export copies those mirror settings**
+  (you can still change them in the save sheet): exporting your video
+  unmirrored next to a mirror-style tutorial made the two look opposite.
 - **The AI compares what you see on screen.** If you look the same as the
   tutorial on screen (with the current mirror settings), it counts as a
   match. So the mirror toggles affect the analysis, and the app tells you

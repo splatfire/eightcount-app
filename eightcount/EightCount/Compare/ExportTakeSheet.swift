@@ -15,15 +15,22 @@ struct ExportTakeSheet: View {
     /// Only shown when you practiced slower than the tutorial.
     @State private var realTempo = true
     @State private var mirrored = false
+    /// "Me + tutorial": start with the same flips as the compare screen, so
+    /// the saved video looks like what you compared.
+    @State private var mirrorMe: Bool
+    @State private var mirrorTutorial: Bool
 
     /// Read the take's values now (on the main actor) and keep plain copies.
-    init(take: Take, project: Project) {
-        self.init(snapshot: TakeSnapshot(take: take, tutorialURL: project.videoURL))
+    init(take: Take, project: Project, mirrorMe: Bool = true, mirrorTutorial: Bool = false) {
+        self.init(snapshot: TakeSnapshot(take: take, tutorialURL: project.videoURL),
+                  mirrorMe: mirrorMe, mirrorTutorial: mirrorTutorial)
     }
 
-    init(snapshot: TakeSnapshot) {
+    init(snapshot: TakeSnapshot, mirrorMe: Bool = true, mirrorTutorial: Bool = false) {
         self.snapshot = snapshot
         _option = State(initialValue: snapshot.tutorialURL == nil ? .original : .meWithSong)
+        _mirrorMe = State(initialValue: mirrorMe)
+        _mirrorTutorial = State(initialValue: mirrorTutorial)
     }
 
     private var hasTutorial: Bool { snapshot.tutorialURL != nil }
@@ -32,7 +39,8 @@ struct ExportTakeSheet: View {
     private var kind: TakeExportKind {
         switch option {
         case .meWithSong: return .meWithSong(realTempo: realTempo || !practicedSlower, mirrored: mirrored)
-        case .sideBySide: return .sideBySide(realTempo: realTempo || !practicedSlower)
+        case .sideBySide: return .sideBySide(realTempo: realTempo || !practicedSlower,
+                                             mirrorMe: mirrorMe, mirrorTutorial: mirrorTutorial)
         case .original: return .original
         }
     }
@@ -110,6 +118,18 @@ struct ExportTakeSheet: View {
                             }
                             .tint(Theme.accent)
                         }
+                        Toggle(isOn: $mirrorMe) {
+                            toggleLabel("Mirror me", "Flips your video left to right.")
+                        }
+                        .tint(Theme.accent)
+                        Toggle(isOn: $mirrorTutorial) {
+                            toggleLabel("Mirror tutorial", "Flips the tutorial left to right.")
+                        }
+                        .tint(Theme.accent)
+                        Text("Set like the compare screen, so moves on the same side line up.")
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(Theme.secondaryText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     Text("Only post the tutorial if you have the rights to it.")
                         .font(.system(.footnote, design: .rounded))

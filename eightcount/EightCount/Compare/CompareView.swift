@@ -133,7 +133,8 @@ struct CompareView: View {
             try? modelContext.save()
         }
         .sheet(isPresented: $showExport) {
-            ExportTakeSheet(take: take, project: project)
+            ExportTakeSheet(take: take, project: project,
+                            mirrorMe: mirrorMe, mirrorTutorial: mirrorTutorial)
         }
         .sheet(isPresented: $showAnalysis, onDismiss: {
             report = take.analysisReport

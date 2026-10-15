@@ -6,6 +6,9 @@ import SwiftUI
 @MainActor
 struct TakesListView: View {
     let project: Project
+    /// Whether the practice screen shows the tutorial mirrored (the compare
+    /// screen starts the same way; "Save video" copies it).
+    let tutorialMirrored: Bool
     let onOpen: (Take) -> Void
     let onRecordNew: () -> Void
 
@@ -18,8 +21,10 @@ struct TakesListView: View {
     /// The take whose "Save video" sheet is open.
     @State private var takeToExport: ExportTarget?
 
-    init(project: Project, onOpen: @escaping (Take) -> Void, onRecordNew: @escaping () -> Void) {
+    init(project: Project, tutorialMirrored: Bool = false,
+         onOpen: @escaping (Take) -> Void, onRecordNew: @escaping () -> Void) {
         self.project = project
+        self.tutorialMirrored = tutorialMirrored
         self.onOpen = onOpen
         self.onRecordNew = onRecordNew
     }
@@ -56,7 +61,8 @@ struct TakesListView: View {
                 }
             }
             .sheet(item: $takeToExport) { target in
-                ExportTakeSheet(take: target.take, project: project)
+                ExportTakeSheet(take: target.take, project: project,
+                                mirrorMe: true, mirrorTutorial: tutorialMirrored)
             }
             .confirmationDialog(
                 "Delete this recording?",
