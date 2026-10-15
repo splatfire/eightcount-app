@@ -258,6 +258,9 @@ for d in devices:
     hw = d.get("hardwareProperties", {})
     if hw.get("platform") != "iOS" or hw.get("deviceType", "iPhone") != "iPhone":
         continue
+    # Only real iPhones: devicectl can also list simulators ("virtual").
+    if hw.get("reality", "physical") != "physical":
+        continue
     conn = d.get("connectionProperties", {})
     props = d.get("deviceProperties", {})
     row = [d.get("identifier", ""), hw.get("udid", ""), props.get("name", "iPhone"),
