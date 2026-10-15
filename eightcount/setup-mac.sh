@@ -24,6 +24,9 @@
 #      VPN & Device Management → your Apple ID → Trust (one time)
 set -euo pipefail
 cd "$(dirname "$0")"
+# Kept so the script can restart itself after downloading a newer version of itself.
+ORIG_ARGS=("$@")
+SCRIPT_SUM=$(shasum setup-mac.sh 2>/dev/null || echo "")
 
 INSTALL=0; OPEN=1; UPDATE=0; REFRESH=0; TEAM_ID=""; BUNDLE_ID=""
 AGENT_LABEL="io.github.splatfire.eightcount.refresh"
@@ -158,7 +161,7 @@ if [ -n "$OLD_TEAM" ]; then
   git checkout -- project.yml 2>/dev/null || true
 fi
 
-OLD_HEAD=$(git -C .. rev-parse HEAD 2>/dev/null || echo "")
+OLD_HEAD=${EIGHTCOUNT_OLD_HEAD:-$(git -C .. rev-parse HEAD 2>/dev/null || echo "")}
 if [ "$UPDATE" = 1 ]; then
   step "Downloading the newest version"
   if ! git -C .. pull --autostash --ff-only; then
@@ -168,6 +171,13 @@ if [ "$UPDATE" = 1 ]; then
   fi
 fi
 NEW_HEAD=$(git -C .. rev-parse HEAD 2>/dev/null || echo "")
+# The download changed this script itself: finish with the NEW version
+# (bash would otherwise keep running the old one, with old settings).
+if [ -z "${EIGHTCOUNT_REEXEC:-}" ] && [ "$(shasum setup-mac.sh 2>/dev/null || echo "")" != "$SCRIPT_SUM" ]; then
+  echo "This setup script was updated too — restarting it."
+  export EIGHTCOUNT_REEXEC=1 EIGHTCOUNT_OLD_HEAD="$OLD_HEAD"
+  exec bash ./setup-mac.sh ${ORIG_ARGS[@]+"${ORIG_ARGS[@]}"}
+fi
 
 # ---------------------------------------------------------------- Xcode
 step "Checking Xcode"
@@ -223,6 +233,7 @@ fi
 SAVED_TEAM="$TEAM_ID"; SAVED_BUNDLE="$BUNDLE_ID"; save_settings
 DEFAULT_BUNDLE_ID=$(sed -nE 's/.*EC_APP_BUNDLE_ID: ([^ ]+)  # app bundle ID.*/\1/p' project.yml)
 APP_BUNDLE_ID="${BUNDLE_ID:-$DEFAULT_BUNDLE_ID}"
+[ -n "$APP_BUNDLE_ID" ] || fail "Couldn't read the app's bundle ID (EC_APP_BUNDLE_ID) from project.yml."
 [ -n "$BUNDLE_ID" ] && echo "Using your bundle ID $BUNDLE_ID"
 
 # ---------------------------------------------------------------- Project
