@@ -7,3 +7,4 @@ DerivedData/
 build/
 device-build.log
 .eightcount-local
+.refresh-state

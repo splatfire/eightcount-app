@@ -166,6 +166,17 @@ window to put it into its Photos app.
 3. Do the same at least every 7 days. With a free Apple ID, apps stop
    opening after 7 days, and the update restarts that clock. Your projects
    stay.
+4. **Or let the Mac do it automatically:**
+   ```sh
+   ~/splatfire/eightcount/setup-mac.sh --auto-refresh
+   ```
+   A small background job checks every 3 hours. About once a day, when
+   the Mac is awake and your iPhone is on the same Wi-Fi and unlocked, it
+   renews the 7-day signature and installs my latest updates. You get a
+   Mac notification only when something needs you, for example "stops
+   opening on Fri, unlock your iPhone near the Mac". The log is in
+   `~/Library/Logs/EightCount-refresh.log`. To switch it off:
+   `setup-mac.sh --auto-refresh-off`.
 
 **Later (paid Apple Developer Program, 99 USD/EUR per year): TestFlight, no Mac at all**
 

@@ -7,6 +7,9 @@
 #   ./setup-mac.sh --update    download the newest version from GitHub, then install
 #                              it on the iPhone (over Wi-Fi works too)
 #   ./setup-mac.sh --shortcut  put a double-clickable "Update EightCount" on your Desktop
+#   ./setup-mac.sh --auto-refresh      let the Mac refresh/update the app by itself in
+#                                      the background (about once a day, over Wi-Fi)
+#   ./setup-mac.sh --auto-refresh-off  switch that off again
 #
 # Options:
 #   --team ABCDE12345          your Apple Team ID (found automatically if possible)
@@ -22,11 +25,57 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-INSTALL=0; OPEN=1; UPDATE=0; TEAM_ID=""; BUNDLE_ID=""
+INSTALL=0; OPEN=1; UPDATE=0; REFRESH=0; TEAM_ID=""; BUNDLE_ID=""
+AGENT_LABEL="io.github.splatfire.eightcount.refresh"
+AGENT_PLIST="$HOME/Library/LaunchAgents/$AGENT_LABEL.plist"
+REFRESH_LOG="$HOME/Library/Logs/EightCount-refresh.log"
 while [ $# -gt 0 ]; do
   case "$1" in
     --install) INSTALL=1 ;;
     --update) UPDATE=1; INSTALL=1; OPEN=0 ;;
+    # Used by the background job (see --auto-refresh): quiet, no Xcode window,
+    # skips the extra compile check, and only acts about once a day.
+    --refresh) REFRESH=1; UPDATE=1; INSTALL=1; OPEN=0 ;;
+    --auto-refresh)
+      mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
+      cat > "$AGENT_PLIST" <<PL
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$AGENT_LABEL</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>$(pwd)/setup-mac.sh</string>
+    <string>--refresh</string>
+  </array>
+  <!-- Try every 3 hours (and when you log in). The script itself only does
+       the real work about once a day, when your iPhone is reachable. -->
+  <key>StartInterval</key><integer>10800</integer>
+  <key>RunAtLoad</key><true/>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>StandardOutPath</key><string>$REFRESH_LOG</string>
+  <key>StandardErrorPath</key><string>$REFRESH_LOG</string>
+</dict>
+</plist>
+PL
+      launchctl bootout "gui/$(id -u)" "$AGENT_PLIST" 2>/dev/null || true
+      launchctl bootstrap "gui/$(id -u)" "$AGENT_PLIST"
+      echo "✓ Auto-refresh is on."
+      echo "  Your Mac now refreshes EightCount (and installs my updates) about once a day,"
+      echo "  whenever it's awake and your iPhone is on the same Wi-Fi and unlocked."
+      echo "  You get a notification if something needs you. Log: $REFRESH_LOG"
+      echo "  Switch off: ./setup-mac.sh --auto-refresh-off"
+      exit 0 ;;
+    --auto-refresh-off)
+      launchctl bootout "gui/$(id -u)" "$AGENT_PLIST" 2>/dev/null || true
+      rm -f "$AGENT_PLIST"
+      echo "Auto-refresh is off."
+      exit 0 ;;
     --shortcut)
       SHORTCUT="$HOME/Desktop/Update EightCount.command"
       cat > "$SHORTCUT" <<SH
@@ -51,7 +100,44 @@ SH
 done
 
 step() { printf '\n\033[1;35m==> %s\033[0m\n' "$1"; }
-fail() { printf '\n\033[1;31m✗ %s\033[0m\n' "$1"; exit 1; }
+# A macOS notification — only for the background refresh (you're not watching it).
+notify() {
+  [ "$REFRESH" = 1 ] || return 0
+  osascript -e "display notification \"$1\" with title \"EightCount\"" >/dev/null 2>&1 || true
+}
+fail() {
+  printf '\n\033[1;31m✗ %s\033[0m\n' "$1"
+  notify "Auto-refresh needs you: $(printf '%s' "$1" | head -1 | tr -d '"')"
+  exit 1
+}
+
+# Background-refresh bookkeeping: when it last worked and when the app's
+# 7-day signature runs out (seconds since 1970).
+STATE_FILE=".refresh-state"
+LAST_OK=0; EXPIRES=0
+# shellcheck source=/dev/null
+[ -f "$STATE_FILE" ] && . "./$STATE_FILE"
+NOW=$(date +%s)
+if [ "$REFRESH" = 1 ]; then
+  echo; echo "=== $(date) — background refresh"
+  # Did it already work in the last 20 hours, with more than 3 days left? Then rest.
+  if [ $((NOW - LAST_OK)) -lt $((20 * 3600)) ] && [ $((EXPIRES - NOW)) -gt $((3 * 86400)) ]; then
+    echo "Refreshed recently (valid until $(date -r "$EXPIRES")), nothing to do."
+    exit 0
+  fi
+fi
+# Not able to refresh right now (iPhone away/locked): fine, try again later —
+# but warn when the app is about to stop opening.
+soft_stop() {
+  echo "$1"
+  if [ "$REFRESH" = 1 ]; then
+    if [ "$EXPIRES" -gt 0 ] && [ $((EXPIRES - NOW)) -lt $((2 * 86400)) ]; then
+      notify "EightCount stops opening on $(date -r "$EXPIRES" '+%a %H:%M'). Unlock your iPhone near the Mac (same Wi-Fi)."
+    fi
+    exit 0
+  fi
+  fail "$1"
+}
 
 # Your personal settings (Team ID, bundle ID) live in this file, not in
 # project.yml, so downloading updates never clashes with your changes.
@@ -72,10 +158,16 @@ if [ -n "$OLD_TEAM" ]; then
   git checkout -- project.yml 2>/dev/null || true
 fi
 
+OLD_HEAD=$(git -C .. rev-parse HEAD 2>/dev/null || echo "")
 if [ "$UPDATE" = 1 ]; then
   step "Downloading the newest version"
-  git -C .. pull --autostash --ff-only || fail "Couldn't download the update (see the message above)."
+  if ! git -C .. pull --autostash --ff-only; then
+    # Offline or similar: the background refresh still renews the current version.
+    [ "$REFRESH" = 1 ] || fail "Couldn't download the update (see the message above)."
+    echo "Couldn't download updates right now — refreshing the current version."
+  fi
 fi
+NEW_HEAD=$(git -C .. rev-parse HEAD 2>/dev/null || echo "")
 
 # ---------------------------------------------------------------- Xcode
 step "Checking Xcode"
@@ -130,6 +222,9 @@ APP_BUNDLE_ID="${BUNDLE_ID:-$DEFAULT_BUNDLE_ID}"
 step "Generating EightCount.xcodeproj"
 xcodegen generate
 
+if [ "$REFRESH" = 1 ]; then
+  : # the background refresh skips the extra compile check (the real build below checks anyway)
+else
 step "Compile check (no signing, 1–3 minutes the first time)"
 if xcodebuild build -project EightCount.xcodeproj -scheme EightCount \
      -configuration Debug -destination 'generic/platform=iOS' \
@@ -140,6 +235,7 @@ else
   grep -E "error:" build.log | sort -u || tail -40 build.log
   echo "Full log: $(pwd)/build.log"
   [ "$INSTALL" = 1 ] && fail "Fix the build errors first (or ask Claude Code with the log)."
+fi
 fi
 
 # ---------------------------------------------------------------- iPhone
@@ -174,7 +270,7 @@ print("|".join(best) if best else "")
 PY
 )
   rm -f "$JSON"
-  [ -n "$DEVICE_INFO" ] || fail "No iPhone found. Unlock it and make sure it's on the same Wi-Fi as
+  [ -n "$DEVICE_INFO" ] || soft_stop "No iPhone found. Unlock it and make sure it's on the same Wi-Fi as
   this Mac (or connect the cable). The very first time it must be connected by
   cable and you tap \"Trust This Computer\". Then run this script again."
   IFS='|' read -r DEVICE_ID DEVICE_UDID DEVICE_NAME PAIRING DEVMODE _ <<< "$DEVICE_INFO"
@@ -185,6 +281,27 @@ PY
     fail "Developer Mode is off. On the iPhone: Settings → Privacy & Security → Developer Mode
   → on → Restart → after restart tap \"Turn On\". Then run this script again."
   fi
+
+  # Free Apple ID signatures last 7 days. Throw away a cached signing profile
+  # for this app that runs out within 4 days, so Xcode makes a fresh one.
+  for dir in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" \
+             "$HOME/Library/MobileDevice/Provisioning Profiles"; do
+    [ -d "$dir" ] || continue
+    for f in "$dir"/*.mobileprovision; do
+      [ -e "$f" ] || continue
+      info=$(security cms -D -i "$f" 2>/dev/null | python3 -c '
+import sys, plistlib, calendar
+d = plistlib.loads(sys.stdin.buffer.read())
+print(d.get("Entitlements", {}).get("application-identifier", "-"),
+      calendar.timegm(d["ExpirationDate"].timetuple()))' 2>/dev/null) || continue
+      appid=${info% *}; exp=${info##* }
+      case "$appid" in *".$APP_BUNDLE_ID") ;; *) continue ;; esac
+      if [ $((exp - NOW)) -lt $((4 * 86400)) ]; then
+        echo "Replacing an old signing profile (ran out $(date -r "$exp" '+%a %d %b'))."
+        rm -f "$f"
+      fi
+    done
+  done
 
   step "Building and signing for $DEVICE_NAME (team $TEAM_ID)"
   if ! xcodebuild build -project EightCount.xcodeproj -scheme EightCount \
@@ -209,8 +326,24 @@ PY
   APP=build/device/Build/Products/Debug-iphoneos/EightCount.app
   echo "✓ Built and signed."
 
+  # When does this build's signature run out?
+  NEW_EXPIRES=$(security cms -D -i "$APP/embedded.mobileprovision" 2>/dev/null | python3 -c '
+import sys, plistlib, calendar
+print(calendar.timegm(plistlib.loads(sys.stdin.buffer.read())["ExpirationDate"].timetuple()))' 2>/dev/null || echo 0)
+  [ "$NEW_EXPIRES" -gt 0 ] && echo "This build works until $(date -r "$NEW_EXPIRES")."
+
   step "Installing on $DEVICE_NAME"
-  xcrun devicectl device install app --device "$DEVICE_ID" "$APP"
+  if ! xcrun devicectl device install app --device "$DEVICE_ID" "$APP"; then
+    soft_stop "Couldn't install right now (is the iPhone locked or out of Wi-Fi range?)."
+  fi
+  printf 'LAST_OK=%s\nEXPIRES=%s\n' "$(date +%s)" "$NEW_EXPIRES" > "$STATE_FILE"
+  if [ "$REFRESH" = 1 ]; then
+    echo "✓ Refreshed in the background."
+    if [ -n "$NEW_HEAD" ] && [ "$NEW_HEAD" != "$OLD_HEAD" ]; then
+      notify "Updated to the newest version (works until $(date -r "$NEW_EXPIRES" '+%a %d %b'))."
+    fi
+    exit 0
+  fi
 
   step "Launching EightCount"
   if xcrun devicectl device process launch --device "$DEVICE_ID" "$APP_BUNDLE_ID" >/dev/null 2>&1; then
