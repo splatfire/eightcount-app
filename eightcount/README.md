@@ -5,8 +5,8 @@ tutorial and dance-practice videos:
 
 - **Import** a video from Photos or Files. The app keeps its own copy, so the
   video stays even if you delete it from Photos.
-- **Practice playback**: mirror, 0.25× / 0.5× / 0.75× / 1× speed (the music
-  keeps its pitch), an A-B loop you can set while the video plays, a scrubber,
+- **Practice playback**: mirror, 0.25× / 0.5× / 0.75× / 1× / 2× speed (the
+  music keeps its pitch), an A-B loop you can set while the video plays, a scrubber,
   a fine-scrub strip and ±1-frame buttons.
 - **8-count grid**: type the BPM or tap along, set where count 1 starts, and
   the video is split into 8-counts. Tap one to jump there, or loop just that one.
@@ -531,8 +531,10 @@ Change any of them later.
   session. This also pauses music from other apps.
 - **Pitch correction uses Apple's `.spectral` algorithm**, the highest-quality
   one.
-- **Speed is one of four buttons** (0.25×, 0.5×, 0.75×, 1×), no free slider.
-  The speed stays when you loop or jump.
+- **Speed is one of five buttons** (0.25×, 0.5×, 0.75×, 1×, 2×), no free
+  slider. The speed stays when you loop or jump. 2× is for skimming to a part
+  or checking you remember the order; recording always uses 1× or slower
+  (if the player is on 2×, the recording starts at 1×).
 - **Scrubbing precision comes in three layers**: the normal timeline slider,
   a "fine-scrub" strip (drag about 7 pt = 1 frame), and ◀︎/▶︎ one-frame buttons
   (hold to repeat). Frame length comes from the video's frame rate.

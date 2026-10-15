@@ -42,7 +42,7 @@ final class SyncedPlayback {
     private(set) var loadError: String? = nil
 
     /// Speeds offered in the UI.
-    nonisolated static let speeds: [Float] = [0.25, 0.5, 0.75, 1.0]
+    nonisolated static let speeds: [Float] = [0.25, 0.5, 0.75, 1.0, 2.0]
     /// Frame stepping uses this fixed frame rate.
     nonisolated static let stepFPS: Double = 30
 
