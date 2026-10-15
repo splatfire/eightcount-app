@@ -85,16 +85,26 @@ final class EightCountUITests: XCTestCase {
         sleep(1)
 
         // 7. My Takes → Compare
+        // Stop the looping 8-count first: the Simulator is slow to open the
+        // toolbar menu while the video keeps redrawing.
+        let pause = app.buttons["Pause"].firstMatch
+        if pause.exists { pause.tap() }
         let takesItem = app.buttons["My Takes (1)"].firstMatch
         let more = app.buttons["More"].firstMatch
         let hittable = NSPredicate(format: "exists == true AND hittable == true")
-        for attempt in 0..<3 {
-            if more.exists && more.isHittable { more.tap() }
+        for attempt in 0..<4 {
+            let moreReady = XCTNSPredicateExpectation(predicate: hittable, object: more)
+            if XCTWaiter().wait(for: [moreReady], timeout: 5) == .completed { more.tap() }
             let wait = XCTNSPredicateExpectation(predicate: hittable, object: takesItem)
-            if XCTWaiter().wait(for: [wait], timeout: 5) == .completed { break }
-            // Menu didn't open properly: close whatever is open and retry.
-            if attempt < 2 { app.tap(); sleep(1) }
+            if XCTWaiter().wait(for: [wait], timeout: 8) == .completed { break }
+            // Menu didn't open properly: close it by tapping the status bar
+            // (not the middle of the screen, which hits the video) and retry.
+            if attempt < 3 {
+                app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.02)).tap()
+                sleep(1)
+            }
         }
+        if !takesItem.isHittable { shot("07-menu-failed") }
         XCTAssertTrue(takesItem.isHittable, "My Takes menu item not tappable")
         takesItem.tap()
         let takeRow = app.cells.firstMatch
