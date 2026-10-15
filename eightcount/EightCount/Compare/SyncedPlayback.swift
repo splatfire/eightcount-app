@@ -97,6 +97,10 @@ final class SyncedPlayback {
         self.tutorialPlayer = tutorial
         self.takePlayer = takePlayer
         self.nudge = take.syncNudge
+        // Start at the speed you recorded at (your video then plays as filmed,
+        // the tutorial as you heard it). 1× = both at the song's real tempo.
+        let recorded = Float(take.timing.rate)
+        self.rate = Self.speeds.min { abs($0 - recorded) < abs($1 - recorded) } ?? 1
     }
 
     /// Plays sound even when the silent switch is on (and after recording,

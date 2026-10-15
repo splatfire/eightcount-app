@@ -305,7 +305,9 @@ How a practice session works in the code:
 
 1. In the practice screen, put the video where you want to start. Pick a
    speed: practicing at 0.5× is fine, because the compare screen accounts
-   for it. Tip: set an A-B loop, or loop one 8-count, to record exactly that
+   for it. The replay opens at the speed you recorded at (your video as
+   filmed, the tutorial as you heard it); tap **1×** to see both at the
+   song's real tempo (your video is sped up to match). Tip: set an A-B loop, or loop one 8-count, to record exactly that
    part.
 2. Tap **⏺ (Record yourself)** at the top. Put the phone on a stand so your
    **whole body** is visible, then tap the red button. Recording starts, a
