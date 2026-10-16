@@ -344,7 +344,12 @@ final class EightCountUITests: XCTestCase {
         addDancer.tap()
         shot("31-formation-editor")
         app.buttons["Done"].firstMatch.tap()
-        waitFor(app.otherElements["formationMini"].firstMatch, 15)
+        // The mini map on the video (the list's copy is inside the row's button).
+        let onVideo = app.otherElements["videoFormation"].firstMatch
+        let asImage = app.images["videoFormation"].firstMatch
+        let shown = NSPredicate { _, _ in onVideo.exists || asImage.exists }
+        XCTAssertEqual(XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: shown, object: nil)], timeout: 15),
+                       .completed, "Formation mini map not shown on the video")
         shot("32-formation-in-list")
     }
 

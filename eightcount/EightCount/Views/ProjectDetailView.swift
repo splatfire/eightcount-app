@@ -352,6 +352,7 @@ struct ProjectDetailView: View {
                 if let shown = currentFormation {
                     FormationMiniMap(formation: shown)
                         .frame(width: 84, height: 52)
+                        .accessibilityIdentifier("videoFormation")
                         .padding(.top, controller.isMirrored ? 36 : 8)
                         .padding(.trailing, 8)
                         .allowsHitTesting(false)
