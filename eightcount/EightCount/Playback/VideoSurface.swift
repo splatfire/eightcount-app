@@ -32,7 +32,20 @@ struct VideoSurface: View {
                 .offset(pan)
                 .opacity(controller.isReady ? 1 : 0)
 
-            if let error = controller.loadError {
+            if controller.isOnTV {
+                VStack(spacing: 8) {
+                    Image(systemName: "tv")
+                        .font(.system(size: 34, weight: .semibold))
+                    Text("Playing on your TV")
+                        .font(.headline)
+                    Text("This phone is the remote. The TV shows the video unmirrored.")
+                        .font(.caption)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(Theme.secondaryText)
+                }
+                .foregroundStyle(Color.white)
+                .padding()
+            } else if let error = controller.loadError {
                 Label(error, systemImage: "exclamationmark.triangle")
                     .font(.footnote)
                     .foregroundStyle(Theme.secondaryText)

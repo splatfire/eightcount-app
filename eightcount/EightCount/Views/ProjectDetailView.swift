@@ -40,6 +40,9 @@ struct ProjectDetailView: View {
     @State private var watchID = UUID()
     /// False while another screen covers this one (or after going back).
     @State private var isOnScreen = false
+    /// For the practice streak: how long the video has played this visit.
+    @State private var playStartedAt: Date?
+    @State private var playedSeconds: Double = 0
     /// Big video: the video takes most of the screen and the 8-count list
     /// gets smaller. Remembered between launches.
     @AppStorage("bigVideo") private var bigVideo = false
@@ -50,6 +53,8 @@ struct ProjectDetailView: View {
     @State private var zoom = VideoZoom()
     @State private var showTools = false
     @State private var newSection: SectionDraft?
+    @State private var formationTarget: EditTarget?
+    @AppStorage("showFormation") private var showFormation = true
     /// Memory test: the video is covered (not remembered: it's a test, not a setting).
     @State private var memoryTest = false
     @State private var peeking = false
@@ -104,7 +109,15 @@ struct ProjectDetailView: View {
                 if isOnScreen { OrientationLock.allowLandscape() }
             }
         }
+        .onChange(of: controller.isPlaying) { _, playing in
+            countPlayTime(playing: playing)
+        }
+        // Recording a take counts as practice too.
+        .onChange(of: project.takes.count) { old, new in
+            if new > old { PracticeLog.shared.recordPractice(of: project) }
+        }
         .onDisappear {
+            countPlayTime(playing: false)
             isOnScreen = false
             OrientationLock.portraitOnly()
             WatchRemote.shared.detach(id: watchID)
@@ -131,6 +144,7 @@ struct ProjectDetailView: View {
                 currentIndex: currentIndex,
                 memoryTest: $memoryTest,
                 showNextMove: $showNextMove,
+                showFormation: $showFormation,
                 cues: cueSettingsBinding,
                 onBuildUp: { first, last, runs, name in
                     coach.startBuildUp(first: first, last: last, runs: runs, rate: controller.rate,
@@ -144,6 +158,9 @@ struct ProjectDetailView: View {
                 voiceStatus: cues.voiceStatus
             )
             .presentationDetents([.medium, .large])
+        }
+        .sheet(item: $formationTarget) { target in
+            FormationEditorSheet(project: project, countIndex: target.id, count: grid.numberOfEightCounts)
         }
         .sheet(item: $newSection) { draft in
             SectionEditorSheet(draft: draft, count: grid.numberOfEightCounts) { saved in
@@ -286,16 +303,23 @@ struct ProjectDetailView: View {
                 .accessibilityLabel(bigVideo ? "Smaller video" : "Bigger video")
             }
             .overlay(alignment: .topLeading) {
-                Button { showTools = true } label: {
-                    Image(systemName: "figure.dance")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(coach.isActive || memoryTest ? Theme.accent : Color.white)
+                HStack(spacing: 8) {
+                    Button { showTools = true } label: {
+                        Image(systemName: "figure.dance")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(coach.isActive || memoryTest ? Theme.accent : Color.white)
+                            .frame(width: 36, height: 36)
+                            .glassSurface(Circle(), fallback: Color.black.opacity(0.55))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Practice tools")
+                    // AirPlay to a TV (the phone stays the remote).
+                    AirPlayButton()
+                        .frame(width: 22, height: 22)
                         .frame(width: 36, height: 36)
                         .glassSurface(Circle(), fallback: Color.black.opacity(0.55))
                 }
-                .buttonStyle(.plain)
                 .padding(8)
-                .accessibilityLabel("Practice tools")
             }
             .overlay(alignment: .top) {
                 if zoom.isZoomed {
@@ -322,6 +346,16 @@ struct ProjectDetailView: View {
                         .padding(.bottom, 8)
                         .transition(.opacity)
                         .allowsHitTesting(false)
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if let shown = currentFormation {
+                    FormationMiniMap(formation: shown)
+                        .frame(width: 84, height: 52)
+                        .padding(.top, controller.isMirrored ? 36 : 8)
+                        .padding(.trailing, 8)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
                 }
             }
             .animation(.snappy, value: nextMove?.index)
@@ -382,7 +416,8 @@ struct ProjectDetailView: View {
             },
             onSetMastery: { index, mastery in
                 NoteStore.setMastery(mastery, for: index, in: project, context: modelContext)
-            }
+            },
+            onFormation: { formationTarget = EditTarget(id: $0) }
         )
     }
 
@@ -396,6 +431,13 @@ struct ProjectDetailView: View {
         guard next < grid.numberOfEightCounts,
               let text = NextMoveHint.text(of: project.note(for: next)) else { return nil }
         return (next, text)
+    }
+
+    /// Where everyone stands in the 8-count that's playing (or the last one
+    /// before it that has a formation). Hidden in the memory test.
+    private var currentFormation: Formation? {
+        guard showFormation, !memoryTest, grid.isValid else { return nil }
+        return Formation.effective(for: currentIndex ?? 0, in: project)?.formation
     }
 
     /// The 8-counts the loop covers, when it lines up with whole 8-counts.
@@ -446,6 +488,21 @@ struct ProjectDetailView: View {
         controller.countInOnLoop = cueCountIn && cueCountInLoop
         cues.update(settings: cueSettings, grid: grid) { [project] index in
             NextMoveHint.text(of: project.note(for: index))
+        }
+    }
+
+    /// Adds up playing time; after a minute today counts as a practice day.
+    private func countPlayTime(playing: Bool) {
+        if playing {
+            if playStartedAt == nil { playStartedAt = .now }
+            return
+        }
+        guard let started = playStartedAt else { return }
+        playStartedAt = nil
+        let before = playedSeconds
+        playedSeconds += Date.now.timeIntervalSince(started)
+        if before < 60 && playedSeconds >= 60 {
+            PracticeLog.shared.recordPractice(of: project)
         }
     }
 

@@ -128,6 +128,11 @@ struct CountRowView: View {
             if let note, !note.snapshots.isEmpty {
                 thumbnailStrip(note.sortedSnapshots)
             }
+
+            if let formation = Formation.decode(note?.formationData), !formation.dancers.isEmpty {
+                FormationMiniMap(formation: formation)
+                    .frame(width: 72, height: 45)
+            }
         }
         .padding(.top, 3)
         .frame(maxWidth: .infinity, alignment: .leading)

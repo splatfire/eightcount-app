@@ -36,6 +36,18 @@ tutorial and dance-practice videos:
   the counts, your own move names) that can **fade out** as you repeat; and
   named **sections** ("Chorus" = 8-counts 9–16) you loop with one tap.
   **Pinch the video** to zoom in on feet or hands.
+- **Find the beat for me**: the tempo screen listens to the music and sets
+  the BPM and count 1 (check it by ear; ½× / 2× and "move count 1" buttons).
+- **Progress**: mark each 8-count "Got it" or "Still learning" (long-press),
+  a progress bar per project, and a **memory test while recording** (the
+  tutorial is hidden, then you tick the 8-counts you forgot).
+- **Formation map**: draw where everyone stands per 8-count; a mini map shows
+  on the video and in the list.
+- **Practice streak** on the home screen and optional **review reminders**
+  (a notification two days after you practised a dance).
+- **AirPlay to a TV**: the video plays on the TV, the phone (and watch) are
+  the remote. **Landscape** practice screen. **Open project files** straight
+  from AirDrop, Messages or Files.
 - **Apple Watch remote** (watchOS 10+): play/pause, back/next 8-count,
   speed (also with the Digital Crown) and loop from your wrist, plus which
   8-count is playing. See 1.8.
@@ -408,6 +420,36 @@ tools need to know where each 8-count is.
   **Loop** button. Sections are included when you export a project.
 - **Zoom**: pinch the video, drag to look around, tap the "2.0× ✕" chip to
   see everything again.
+- **Count-in before every loop**: under Cues, after switching on the count-in.
+
+### More tools
+
+- **Find the beat**: tap the tempo bar above the list → **Find the beat**.
+  The app listens to the video's music (on the iPhone) and sets the BPM and
+  count 1. Then play from count 1 and count along: if it's twice too fast or
+  slow, tap **½ tempo / 2× tempo**; if "1" lands on a "5" or one beat off,
+  use **−4 / −1 / +1 / +4 counts**. A yellow "not sure" means: check
+  carefully, or tap along instead.
+- **Progress**: long-press an 8-count → **Got it** or **Still learning**. The
+  bar above the list and the project list show how much you know.
+- **Memory test while recording**: on the record screen, tap the **eye**
+  (or turn on Memory test in ✦ first). The tutorial is hidden, the music and
+  the count keep going. After the take, tick the 8-counts you forgot: they
+  become "Still learning", the rest "Got it".
+- **Formation**: long-press an 8-count → **Formation…**. Add dancers, drag
+  them to their spots (the audience is at the bottom), tap one to rename it
+  or mark it as **Me**. ‹ › goes to the next 8-count, which starts from the
+  previous formation. A mini map appears in the list and on the video
+  (switch it off in ✦ → On the video).
+- **Streak and reminders**: practise a minute (or record a take) to count the
+  day. Turn on reminders under ⚙ on the home screen: two days after you
+  practised a dance, at 18:00, you get a "time to review" notification.
+- **TV**: tap the AirPlay button on the video (next to ✦) and pick your
+  Apple TV or AirPlay TV. The TV shows the video without mirroring.
+- **Landscape**: turn the phone sideways on the practice screen: video and
+  controls on the left, the 8-counts on the right.
+- **Open a shared project file**: tap the `.eightcount.json` file in AirDrop,
+  Messages, Mail or Files → share → **EightCount**.
 
 How the AI analysis works: Apple's Vision framework finds 15 body points
 (shoulders, elbows, wrists, hips, knees, ankles…) in about 10 frames per
@@ -421,6 +463,15 @@ facial expression or energy.
 ---
 
 ## 5. Check on Mac (what I'm not 100 % sure about)
+
+**New in this round (only checked in the Simulator):**
+- **Find the beat** was tested on generated drum tracks (within ~10 ms) and
+  in the Simulator test video. Real songs with soft or changing beats can
+  fool it; it may pick count "5" instead of "1".
+- **AirPlay**: not testable without a TV. AirPlay sends the original video,
+  so the TV picture is never mirrored.
+- **Review reminders** need you to allow notifications.
+- **Landscape practice screen**: the layout is new; tell me if something is cramped.
 
 **Practice tools (new, only compile-checked):**
 - The spoken numbers are made with the iPhone's own voice when the screen
@@ -732,9 +783,6 @@ Change any of them later.
 
 ## 7. Next steps (not built yet)
 
-- **Count-in before a loop restarts:** right now the count-in plays when you
-  press Play, not each time the loop starts over.
-- **Hide the tutorial while recording** (a memory test you can film).
 - **Practice tracking:** a "practiced / not yet" checkmark per 8-count and a
   progress bar per project.
 

@@ -16,6 +16,8 @@ struct ProjectListView: View {
     @State private var renameTitle = ""
     @State private var renameSection = ""
     @State private var errorMessage: String?
+    @AppStorage(PracticeLog.remindersKey) private var reviewReminders = false
+    private var log: PracticeLog { PracticeLog.shared }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -40,6 +42,15 @@ struct ProjectListView: View {
                         showImporter = true
                     } label: {
                         Label("Import notes", systemImage: "square.and.arrow.down")
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Toggle(isOn: reminderBinding) {
+                            Label("Review reminders", systemImage: "bell")
+                        }
+                    } label: {
+                        Label("Settings", systemImage: "gearshape")
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -123,10 +134,57 @@ struct ProjectListView: View {
 
     // MARK: - Subviews
 
+    /// "🔥 3 days in a row" – practise today to keep it going.
+    private var streakRow: some View {
+        let streak = log.streak
+        return HStack(spacing: 12) {
+            Image(systemName: "flame.fill")
+                .font(.title2)
+                .foregroundStyle(streak > 0 ? Color.orange : Theme.secondaryText)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(streak == 1 ? "1 day of practice" : "\(streak) days in a row")
+                    .font(.headline)
+                Text(log.practisedToday ? "You practised today. Nice!"
+                                        : (streak > 0 ? "Practise today to keep your streak." : "Practise a minute to start a streak."))
+                    .font(.caption)
+                    .foregroundStyle(Theme.secondaryText)
+            }
+            Spacer()
+        }
+        .listRowBackground(Theme.surface)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Turning reminders on asks iOS for permission first.
+    private var reminderBinding: Binding<Bool> {
+        Binding(
+            get: { reviewReminders },
+            set: { on in
+                if on {
+                    Task {
+                        let allowed = await PracticeLog.shared.requestPermission()
+                        reviewReminders = allowed
+                        if !allowed {
+                            errorMessage = "Notifications are off for EightCount. Turn them on in Settings → Notifications → EightCount."
+                        }
+                    }
+                } else {
+                    reviewReminders = false
+                    PracticeLog.shared.cancelAllReviews()
+                }
+            }
+        )
+    }
+
     /// One card per project (each project is its own list section, so the
     /// system draws the rounded card, the chevron and the spacing for us).
     private var list: some View {
         List {
+            if log.streak > 0 || !log.days.isEmpty {
+                Section {
+                    streakRow
+                }
+            }
             ForEach(projects) { project in
                 Section {
                     NavigationLink(value: project) {

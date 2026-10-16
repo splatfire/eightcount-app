@@ -49,6 +49,9 @@ final class PlayerController {
     /// The practice coach watches it to move on after enough runs.
     private(set) var loopWraps = 0
 
+    /// True while the video plays on a TV via AirPlay (the phone is the remote).
+    private(set) var isOnTV = false
+
     /// True during the "5, 6, 7, 8" before the video starts.
     private(set) var isCountingIn = false
     /// Plays the count-in sounds (set by the practice screen when the
@@ -76,6 +79,8 @@ final class PlayerController {
     @ObservationIgnored private var timeObserver: Any? = nil
     /// Watches `player.timeControlStatus` (playing / paused).
     @ObservationIgnored private var statusObservation: NSKeyValueObservation? = nil
+    /// Watches `player.isExternalPlaybackActive` (AirPlay to a TV).
+    @ObservationIgnored private var tvObservation: NSKeyValueObservation? = nil
     /// Token for the "video reached its end" notification.
     @ObservationIgnored private var endObserver: NSObjectProtocol? = nil
 
@@ -101,6 +106,9 @@ final class PlayerController {
         player = AVPlayer()
         // At the end of the video just stop (we handle looping ourselves).
         player.actionAtItemEnd = .pause
+        // AirPlay: send the video itself to the TV (not a mirror of the screen).
+        player.allowsExternalPlayback = true
+        player.usesExternalPlaybackWhileExternalScreenIsActive = true
         // Observers are added in `load(url:)`, not here: SwiftUI may create
         // (and throw away) extra controllers, so `init` should stay cheap.
     }
@@ -184,6 +192,8 @@ final class PlayerController {
         timeObserver = nil
         statusObservation?.invalidate()
         statusObservation = nil
+        tvObservation?.invalidate()
+        tvObservation = nil
         removeEndObserver()
         player.pause()
         setPlaying(false)
@@ -426,6 +436,16 @@ final class PlayerController {
                 guard let self else { return }
                 Task { @MainActor in
                     self.setPlaying(status != .paused)
+                }
+            }
+        }
+
+        if tvObservation == nil {
+            tvObservation = player.observe(\.isExternalPlaybackActive, options: [.initial, .new]) { [weak self] player, _ in
+                let active = player.isExternalPlaybackActive
+                guard let self else { return }
+                Task { @MainActor in
+                    if self.isOnTV != active { self.isOnTV = active }
                 }
             }
         }

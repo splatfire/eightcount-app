@@ -108,6 +108,14 @@ User asked for (subagents must use model "sonnet" to save tokens):
   next-move hint, pinch zoom (VideoZoom), PracticeSection model (+ export/import, list headers, loop).
   Only compile-checked in CI; audio timing needs a test on the iPhone.
 
+- "Integrate the rest" (user picked everything): memory test while recording (RecordView eye button,
+  Take.memoryTest, MemoryResultSheet → CountNote.masteryRaw), progress marks + bars (CountListView,
+  ProjectRow; Project.eightCountTotal), count-in before every loop (PlayerController.countInOnLoop),
+  open .json via CFBundleDocumentTypes (Alternate) + onOpenURL, landscape practice layout,
+  BeatDetector (spectral flux + autocorrelation + comb refine; CI video now has a 120 BPM beat),
+  PracticeLog (streak, review notifications), Formation (CountNote.formationData, editor, mini maps),
+  AirPlay (AVRoutePickerView, isOnTV). UI test testPracticeTools covers most of it.
+
 ## Next step
 - User tests on device: camera recording, real analysis, Apple Intelligence tips; report any issues.
 - Free Apple ID: re-run `./setup-mac.sh --install --no-open` every 7 days.

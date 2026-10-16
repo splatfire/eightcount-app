@@ -12,6 +12,7 @@ struct PracticeToolsSheet: View {
     let currentIndex: Int?
     @Binding var memoryTest: Bool
     @Binding var showNextMove: Bool
+    @Binding var showFormation: Bool
     @Binding var cues: CountCues.Settings
     /// Starts the coach on 8-counts first…last.
     let onBuildUp: (_ first: Int, _ last: Int, _ runs: Int, _ name: String?) -> Void
@@ -30,7 +31,8 @@ struct PracticeToolsSheet: View {
     @State private var editingSection: SectionDraft?
 
     init(project: Project, grid: CountGrid, currentIndex: Int?,
-         memoryTest: Binding<Bool>, showNextMove: Binding<Bool>, cues: Binding<CountCues.Settings>,
+         memoryTest: Binding<Bool>, showNextMove: Binding<Bool>, showFormation: Binding<Bool>,
+         cues: Binding<CountCues.Settings>,
          onBuildUp: @escaping (_ first: Int, _ last: Int, _ runs: Int, _ name: String?) -> Void,
          onSpeedLadder: @escaping (_ first: Int, _ last: Int, _ runs: Int, _ name: String?) -> Void,
          onLoopSection: @escaping (PracticeSection) -> Void,
@@ -40,6 +42,7 @@ struct PracticeToolsSheet: View {
         self.currentIndex = currentIndex
         _memoryTest = memoryTest
         _showNextMove = showNextMove
+        _showFormation = showFormation
         _cues = cues
         self.onBuildUp = onBuildUp
         self.onSpeedLadder = onSpeedLadder
@@ -67,8 +70,13 @@ struct PracticeToolsSheet: View {
                     Toggle(isOn: $showNextMove) {
                         Label("Show the next move", systemImage: "text.badge.chevron.right")
                     }
+                    Toggle(isOn: $showFormation) {
+                        Label("Show the formation", systemImage: "person.3")
+                    }
+                } header: {
+                    Text("On the video")
                 } footer: {
-                    Text("Shows the note of the coming 8-count in the corner of the video.")
+                    Text("The next move: the note of the coming 8-count. The formation: where everyone stands (long-press an 8-count → Formation… to draw it).")
                 }
                 cuesSection
                 sectionsSection

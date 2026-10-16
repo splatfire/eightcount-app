@@ -26,6 +26,8 @@ struct CountListView: View {
     let onNewSection: (Int) -> Void
     /// Long-press menu: "Got it" / "Still learning" / clear.
     let onSetMastery: (Int, Mastery) -> Void
+    /// Long-press menu: "Formation…".
+    let onFormation: (Int) -> Void
 
     init(project: Project, grid: CountGrid, currentIndex: Int?, loopedRange: ClosedRange<Int>?,
          sections: [PracticeSection], loopedSectionID: UUID?, followPlayback: Bool,
@@ -35,7 +37,8 @@ struct CountListView: View {
          onSetupTempo: @escaping () -> Void,
          onLoopSection: @escaping (PracticeSection) -> Void,
          onNewSection: @escaping (Int) -> Void,
-         onSetMastery: @escaping (Int, Mastery) -> Void) {
+         onSetMastery: @escaping (Int, Mastery) -> Void,
+         onFormation: @escaping (Int) -> Void) {
         self.project = project
         self.grid = grid
         self.currentIndex = currentIndex
@@ -50,6 +53,7 @@ struct CountListView: View {
         self.onLoopSection = onLoopSection
         self.onNewSection = onNewSection
         self.onSetMastery = onSetMastery
+        self.onFormation = onFormation
     }
 
     var body: some View {
@@ -157,6 +161,11 @@ struct CountListView: View {
                         }
                     }
                     Divider()
+                    Button {
+                        onFormation(index)
+                    } label: {
+                        Label("Formation…", systemImage: "person.3")
+                    }
                     Button {
                         onNewSection(index)
                     } label: {
