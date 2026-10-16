@@ -103,7 +103,7 @@ struct RecordView: View {
         // A memory test was just saved: ask which 8-counts you forgot.
         .onChange(of: model.reviewTake?.id) { _, _ in
             if let take = model.reviewTake, take.memoryTest,
-               CountGrid(bpm: project.bpm, offset: project.offset, duration: .greatestFiniteMagnitude).isValid {
+               CountGrid.unbounded(bpm: project.bpm, offset: project.offset).isValid {
                 markingTake = MemoryMarkTarget(take: take)
             }
         }
@@ -262,7 +262,7 @@ struct RecordView: View {
     /// Memory test: the count instead of the tutorial picture.
     private func memoryCount(compact: Bool) -> some View {
         TimelineView(.animation(minimumInterval: 0.05)) { _ in
-            let grid = CountGrid(bpm: project.bpm, offset: project.offset, duration: .greatestFiniteMagnitude)
+            let grid = CountGrid.unbounded(bpm: project.bpm, offset: project.offset)
             let time = model.tutorial.currentSeconds()
             let playing = model.phase == .recording
             VStack(spacing: 4) {
@@ -502,24 +502,27 @@ struct RecordView: View {
                 Color.black.opacity(0.3).ignoresSafeArea()
                 VStack(spacing: 0) {
                     Text("GET READY")
-                        .font(.system(.footnote, design: .rounded).weight(.semibold))
+                        .font(.system(value > 0 ? .footnote : .title, design: .rounded).weight(.semibold))
                         .tracking(2)
-                        .foregroundStyle(Color.white.opacity(0.8))
-                    Text("\(value)")
-                        .font(.system(size: 150, weight: .heavy, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(Color.white)
-                        .id(value)
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 1.35).combined(with: .opacity),
-                            removal: .scale(scale: 0.8).combined(with: .opacity)
-                        ))
+                        .foregroundStyle(Color.white.opacity(value > 0 ? 0.8 : 1))
+                    if value > 0 {
+                        Text("\(value)")
+                            .font(.system(size: 150, weight: .heavy, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(Color.white)
+                            .id(value)
+                            // Appear at once (no fade-in), so the number and its beep land together.
+                            .transition(.asymmetric(
+                                insertion: .identity,
+                                removal: .scale(scale: 0.8).combined(with: .opacity)
+                            ))
+                    }
                 }
                 .shadow(color: .black.opacity(0.45), radius: 14)
             }
             .allowsHitTesting(false)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Starting in \(value)")
+            .accessibilityLabel(value > 0 ? "Starting in \(value)" : "Get ready")
         } else if model.showGo {
             Text("GO!")
                 .font(.system(size: 110, weight: .heavy, design: .rounded))
@@ -684,8 +687,12 @@ private final class RecordSessionModel {
     }
 
     /// The camera starts recording this many seconds BEFORE the tutorial.
-    /// (This is saved as the take's `takeOffset`.)
-    nonisolated static let countdownSeconds: Double = 3.0
+    /// (This is saved as the take's `takeOffset`.) Half a second of "GET
+    /// READY", then 3 · 2 · 1, one second each.
+    nonisolated static let countdownSeconds: Double = 3.5
+    /// The "GET READY" moment before the 3. It also gives the iPhone's audio
+    /// time to start, so the first beep isn't late or swallowed.
+    nonisolated static let readySeconds: Double = 0.5
 
     /// The top-bar speaker toggle (`@AppStorage("countdownSound")`, default on).
     private static var countdownSoundEnabled: Bool {
@@ -843,8 +850,12 @@ private final class RecordSessionModel {
         // scheduled on the audio clock relative to the camera's start time.
         if Self.countdownSoundEnabled {
             let hostNow = CMClockGetTime(CMClockGetHostTimeClock()).seconds
-            sounds.schedule(startingAt: hostTime.seconds - hostNow,
-                            interval: Self.countdownSeconds / 3)
+            // The beeps are scheduled for when the iPhone SENDS the sound;
+            // Bluetooth headphones / speakers play it a bit later. Start them
+            // that much earlier, so you HEAR each beep as its number appears.
+            let latency = min(max(AVAudioSession.sharedInstance().outputLatency, 0), 0.5)
+            sounds.schedule(startingAt: hostTime.seconds + Self.readySeconds - hostNow - latency,
+                            interval: 1)
         }
         phase = .countdown
         runCountdown(until: tutorialHostTime.seconds)
@@ -859,7 +870,9 @@ private final class RecordSessionModel {
                 guard let self, !Task.isCancelled else { return }
                 let remaining = targetSeconds - CMClockGetTime(CMClockGetHostTimeClock()).seconds
                 if remaining <= 0 { break }
-                let number = Int(remaining.rounded(.up))
+                // 0 = "GET READY" (before the 3), then 3, 2, 1 – each number
+                // appears exactly when its beep plays.
+                let number = remaining > 3 ? 0 : Int(remaining.rounded(.up))
                 if number != lastShown {
                     lastShown = number
                     withAnimation(.spring(duration: 0.4)) {

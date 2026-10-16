@@ -25,9 +25,17 @@ struct CountGrid: Equatable {
     /// How many 8-counts fit between `offset` and the end of the video.
     /// A partial 8-count at the end still counts.
     var numberOfEightCounts: Int {
-        guard isValid, offset < duration else { return 0 }
+        guard isValid, duration.isFinite, offset < duration else { return 0 }
         // Tiny epsilon so floating-point noise doesn't add an empty 8-count.
-        return Int(ceil((duration - offset) / eightCountDuration - 1e-9))
+        let count = ceil((duration - offset) / eightCountDuration - 1e-9)
+        // Never turn a huge number into an Int (that would crash the app).
+        return count < 1_000_000 ? Int(count) : 1_000_000
+    }
+
+    /// A grid for when the video length doesn't matter (e.g. just to know
+    /// which 8-count a time is in): long enough for any dance (24 hours).
+    static func unbounded(bpm: Double, offset: Double) -> CountGrid {
+        CountGrid(bpm: bpm, offset: offset, duration: 24 * 3600)
     }
 
     /// Start time of 8-count `index`.

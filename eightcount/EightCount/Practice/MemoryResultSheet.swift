@@ -20,7 +20,7 @@ struct MemoryResultSheet: View {
 
     /// The 8-counts the take covers.
     private var indexes: [Int] {
-        let grid = CountGrid(bpm: project.bpm, offset: project.offset, duration: .greatestFiniteMagnitude)
+        let grid = CountGrid.unbounded(bpm: project.bpm, offset: project.offset)
         guard grid.isValid else { return [] }
         let first = grid.index(at: take.tutorialStart) ?? 0
         let last = grid.index(at: max(take.tutorialEnd - 0.05, take.tutorialStart)) ?? first

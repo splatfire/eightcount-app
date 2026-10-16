@@ -726,8 +726,11 @@ Change any of them later.
 - **What gets recorded:** recording starts at the current video position,
   at the current speed and mirror setting. If an A-B loop or a looped
   8-count is active, it records exactly that part and stops at its end.
-- **A 3-second countdown** after you press Record. The recording keeps it,
-  and the app remembers where the tutorial started, so the two line up.
+- **A countdown** after you press Record: half a second of "GET READY",
+  then 3 · 2 · 1 with a beep exactly as each number appears (the beeps are
+  started earlier by the measured output delay, e.g. for Bluetooth
+  headphones). The recording keeps it, and the app remembers where the
+  tutorial started, so the two line up.
 - **Sync fine-tuning.** The camera starts with a small delay that differs
   from phone to phone, so the compare screen has a "Sync" panel to nudge
   your video by ±1 frame or ±0.1 s. The nudge is saved with the take.
