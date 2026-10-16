@@ -321,19 +321,19 @@ final class EightCountUITests: XCTestCase {
         unzoom.tap()
         XCTAssertTrue(unzoom.waitForNonExistence(timeout: 5), "Zoom didn't reset")
 
-        // 8. Progress: long-press 8-count 3 → "Got it".
-        let row3 = element(app, labelBeginsWith: "8-count 3, starts")
-        scrollList(to: row3, in: app)
-        row3.press(forDuration: 1.2)
+        // 8. Progress: long-press 8-count 1 (on screen under the controls) → "Got it".
+        let row1 = element(app, labelBeginsWith: "8-count 1, starts")
+        scrollList(to: row1, in: app)
+        row1.press(forDuration: 1.2)
         let gotIt = app.buttons["Got it"].firstMatch
         waitFor(gotIt, 5)
         gotIt.tap()
         waitFor(element(app, labelContains: "Got it: 1 of"), 10)
         shot("30-progress")
 
-        // 9. Formation for 8-count 3: two dancers.
-        scrollList(to: row3, in: app)
-        row3.press(forDuration: 1.2)
+        // 9. Formation for 8-count 1: two dancers.
+        scrollList(to: row1, in: app)
+        row1.press(forDuration: 1.2)
         let formationItem = app.buttons["Formation…"].firstMatch
         waitFor(formationItem, 5)
         formationItem.tap()
@@ -349,10 +349,9 @@ final class EightCountUITests: XCTestCase {
 
     /// Scrolls the 8-count list until `element` is on screen.
     private func scrollList(to element: XCUIElement, in app: XCUIApplication) {
-        for _ in 0..<6 where !(element.exists && element.isHittable) {
+        for _ in 0..<3 where !(element.exists && element.isHittable) {
             // Drag in the lower part of the screen (the list), not on the video.
-            let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.88))
-            from.press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7)))
+            app.swipeUp(velocity: .slow)
         }
         XCTAssertTrue(element.isHittable, "Can't scroll to \(element)")
     }
