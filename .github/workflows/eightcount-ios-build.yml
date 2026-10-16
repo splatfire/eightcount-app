@@ -119,11 +119,14 @@ jobs:
           command -v xcodegen || brew install xcodegen
           command -v ffmpeg || brew install ffmpeg
 
-      - name: Make a 20 s test video (portrait, test pattern + tone)
+      # Sound: a quiet tone plus a drum hit on every beat at 120 BPM, count 1
+      # at 0.5 s (louder every 4 beats) – the same tempo the demo project
+      # uses, so the UI test can check "Find the beat".
+      - name: Make a 20 s test video (portrait, test pattern + 120 BPM beat)
         run: |
           ffmpeg -loglevel error -y \
             -f lavfi -i testsrc2=size=720x1280:rate=30 \
-            -f lavfi -i sine=frequency=440:sample_rate=44100 \
+            -f lavfi -i "aevalsrc='0.15*sin(2*PI*440*t)+gte(t,0.5)*(0.5+0.4*lt(mod(t-0.5,2),0.25))*exp(-30*mod(t-0.5,0.5))*sin(2*PI*90*t)':s=44100" \
             -t 20 -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest demo.mp4
           ls -la demo.mp4
 

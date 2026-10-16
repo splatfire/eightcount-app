@@ -19,6 +19,10 @@ struct TempoSetupSheet: View {
     @State private var bpmText = ""
     @State private var tapper: TempoTapper
     @FocusState private var bpmFieldFocused: Bool
+    /// Automatic beat detection: running / result / error.
+    @State private var isDetecting = false
+    @State private var detected: BeatDetector.Result?
+    @State private var detectError: String?
 
     init(project: Project,
          currentTime: @escaping () -> Double,
@@ -38,6 +42,7 @@ struct TempoSetupSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
+                    autoCard
                     bpmCard
                     tapCard
                     offsetCard
@@ -77,6 +82,84 @@ struct TempoSetupSheet: View {
             if !bpmFieldFocused { syncTextFromProject() }
         }
         .onDisappear { try? modelContext.save() }
+    }
+
+    // MARK: - 0. Automatic
+
+    private var autoCard: some View {
+        card("Find it for me", systemImage: "waveform") {
+            Button {
+                Task { await detect() }
+            } label: {
+                HStack(spacing: 10) {
+                    if isDetecting {
+                        ProgressView().tint(.white)
+                        Text("Listening to the song…")
+                    } else {
+                        Label(detected == nil ? "Find the beat" : "Find it again", systemImage: "sparkles")
+                    }
+                }
+            }
+            .buttonStyle(.big(isOn: true))
+            .disabled(isDetecting || project.videoURL == nil)
+
+            if let detected {
+                Text(detected.isSure
+                     ? "Found \(TempoTapper.displayString(for: detected.bpm)) BPM, count 1 at \(formatTime(detected.firstDownbeat))."
+                     : "Found \(TempoTapper.displayString(for: detected.bpm)) BPM, count 1 at \(formatTime(detected.firstDownbeat)) – but I'm not sure.")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(detected.isSure ? Theme.known : Theme.learning)
+                    .accessibilityIdentifier("beatResult")
+                HStack(spacing: 8) {
+                    Button("½ tempo") { setBPM(project.bpm / 2) }
+                        .buttonStyle(.big)
+                    Button("2× tempo") { setBPM(project.bpm * 2) }
+                        .buttonStyle(.big)
+                }
+                HStack(spacing: 8) {
+                    shiftButton(-4, label: "−4 counts")
+                    shiftButton(-1, label: "−1 count")
+                    shiftButton(1, label: "+1 count")
+                    shiftButton(4, label: "+4 counts")
+                }
+                helpText("Play from count 1 and count along. Beat too fast or slow? Use ½ / 2×. \"1\" lands on a \"5\" or off by one? Move count 1 with the buttons.")
+            } else if let detectError {
+                helpText(detectError, color: Theme.learning)
+            } else {
+                helpText("The app listens to the video's music and sets the BPM and count 1. Works best with a clear drum beat. Check it afterwards.")
+            }
+        }
+    }
+
+    /// Moves count 1 by whole beats.
+    private func shiftButton(_ beats: Int, label: String) -> some View {
+        Button {
+            guard project.bpm > 0 else { return }
+            var newOffset = project.offset + Double(beats) * 60 / project.bpm
+            if newOffset < 0 { newOffset += 8 * 60 / project.bpm }
+            setOffset(newOffset)
+        } label: {
+            Text(label).font(.footnote.weight(.semibold)).monospacedDigit()
+        }
+        .buttonStyle(.big)
+        .accessibilityLabel(beats > 0 ? "Move count 1 later by \(beats)" : "Move count 1 earlier by \(-beats)")
+    }
+
+    private func detect() async {
+        guard let url = project.videoURL else { return }
+        isDetecting = true
+        detectError = nil
+        defer { isDetecting = false }
+        do {
+            let result = try await BeatDetector.detect(url: url)
+            detected = result
+            setBPM(result.bpm)
+            // setOffset rounds to 1/100 s, like the nudge buttons.
+            setOffset(result.firstDownbeat)
+        } catch {
+            detected = nil
+            detectError = error.localizedDescription
+        }
     }
 
     // MARK: - 1. BPM

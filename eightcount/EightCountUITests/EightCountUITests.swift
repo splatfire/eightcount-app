@@ -216,6 +216,21 @@ final class EightCountUITests: XCTestCase {
         demo.tap()
         waitFor(app.buttons["Loop 8-count 2"], 20)
 
+        // 0. Automatic beat detection: the test video has a drum hit every
+        //    0.5 s (120 BPM) from 0.5 s on.
+        let tempoChip = element(app, labelBeginsWith: "Tempo 120")
+        waitFor(tempoChip, 10)
+        tempoChip.tap()
+        let findBeat = app.buttons["Find the beat"].firstMatch
+        waitFor(findBeat, 10)
+        findBeat.tap()
+        let beatResult = app.staticTexts["beatResult"].firstMatch
+        waitFor(beatResult, 60)
+        shot("19-beat-detected")
+        XCTAssertTrue(beatResult.label.contains("120 BPM"), "Beat detection said: \(beatResult.label)")
+        app.buttons["Done"].firstMatch.tap()
+        XCTAssertTrue(findBeat.waitForNonExistence(timeout: 10), "Tempo sheet didn't close")
+
         // 1. Next-move hint: in the intro, the next 8-count is 1, which has a seeded note.
         waitFor(element(app, labelBeginsWith: "Next, 8-count 1"), 10)
         shot("20-next-move-hint")
