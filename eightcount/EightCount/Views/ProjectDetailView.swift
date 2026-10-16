@@ -38,6 +38,9 @@ struct ProjectDetailView: View {
     @State private var loadedFileName: String?
     /// Identifies this screen to the Apple Watch remote.
     @State private var watchID = UUID()
+    /// Big video: the video takes most of the screen and the 8-count list
+    /// gets smaller. Remembered between launches.
+    @AppStorage("bigVideo") private var bigVideo = false
 
     /// The 8-count layout for the current BPM / offset / video length.
     private var grid: CountGrid {
@@ -131,7 +134,7 @@ struct ProjectDetailView: View {
                 // 8-count list still fit.
                 let aspect = max(controller.videoAspectRatio, 0.1)
                 let videoWidth = max(geo.size.width - 32, 0)
-                let videoHeight = min(videoWidth / aspect, geo.size.height * 0.34)
+                let videoHeight = min(videoWidth / aspect, geo.size.height * (bigVideo ? 0.62 : 0.34))
 
                 VideoSurface(controller: controller)
                     .frame(width: videoWidth, height: videoHeight)
@@ -141,6 +144,21 @@ struct ProjectDetailView: View {
                             .allowsHitTesting(false)
                     }
                     .clipShape(RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous))
+                    // Double-tap the video, or tap the corner button, to make it bigger/smaller.
+                    .onTapGesture(count: 2) { toggleBigVideo() }
+                    .overlay(alignment: .bottomTrailing) {
+                        Button { toggleBigVideo() } label: {
+                            Image(systemName: bigVideo ? "arrow.down.right.and.arrow.up.left"
+                                                       : "arrow.up.left.and.arrow.down.right")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Color.white)
+                                .frame(width: 36, height: 36)
+                                .glassSurface(Circle(), fallback: Color.black.opacity(0.55))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(8)
+                        .accessibilityLabel(bigVideo ? "Smaller video" : "Bigger video")
+                    }
                     .padding(.top, 6)
                     .background(
                         PlayheadTracker(
@@ -340,6 +358,10 @@ struct ProjectDetailView: View {
     }
 
     // MARK: - Actions
+
+    private func toggleBigVideo() {
+        withAnimation(.snappy) { bigVideo.toggle() }
+    }
 
     /// Tap on an 8-count: jump to its first beat.
     private func jump(to index: Int) {
