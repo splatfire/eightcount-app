@@ -123,7 +123,8 @@ struct ProjectDetailView: View {
                     coach.startSpeedLadder(first: first, last: last, runs: runs, name: name,
                                            controller: controller, grid: grid)
                 },
-                onLoopSection: { loopSection($0) }
+                onLoopSection: { loopSection($0) },
+                voiceStatus: cues.voiceStatus
             )
             .presentationDetents([.medium, .large])
         }
@@ -206,6 +207,9 @@ struct ProjectDetailView: View {
                         }
                     }
                     .clipShape(RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous))
+                    // For the UI test (pinch zoom).
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("practiceVideo")
                     // Double-tap the video, or tap the corner button, to make it bigger/smaller.
                     .onTapGesture(count: 2) { toggleBigVideo() }
                     // Pinch to zoom in on the feet / hands; drag to look around.

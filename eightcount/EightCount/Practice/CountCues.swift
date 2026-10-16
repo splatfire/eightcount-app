@@ -36,6 +36,12 @@ final class CountCues: CountInProvider {
     /// How loud the cues are right now (1 = full, 0 = faded out).
     private(set) var level: Float = 1
 
+    /// Whether the spoken numbers are ready (shown in the Practice sheet).
+    enum VoiceStatus: Equatable {
+        case notLoaded, loading, ready, unavailable
+    }
+    private(set) var voiceStatus: VoiceStatus = .notLoaded
+
     @ObservationIgnored private var settings = Settings()
     @ObservationIgnored private var grid = CountGrid(bpm: 0, offset: 0, duration: 0)
     @ObservationIgnored private weak var controller: PlayerController?
@@ -271,6 +277,7 @@ final class CountCues: CountInProvider {
         }
         if !voiceLoading {
             voiceLoading = true
+            voiceStatus = .loading
             Task { await loadVoice() }
         }
     }
@@ -299,6 +306,7 @@ final class CountCues: CountInProvider {
                   let clip = Self.trimmed(raw) else { continue }
             clips["in\(i + 5)"] = clip
         }
+        voiceStatus = (1...8).allSatisfy { clips["\($0)"] != nil } ? .ready : .unavailable
     }
 
     private static func loadClip(named name: String) -> AVAudioPCMBuffer? {

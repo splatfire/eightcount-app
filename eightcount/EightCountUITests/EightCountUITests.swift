@@ -197,4 +197,142 @@ final class EightCountUITests: XCTestCase {
         XCTAssertTrue(failedText.exists, "Analysis didn't end with the friendly error")
         shot("12-analysis-done")
     }
+
+    // MARK: - Practice tools
+
+    /// The ✦ practice tools: next-move hint, memory test, cues (just "does
+    /// it run without crashing" – a test can't listen), sections, the
+    /// build-up coach moving on by itself, the speed ladder and pinch zoom.
+    func testPracticeTools() throws {
+        let video = try XCTUnwrap(ProcessInfo.processInfo.environment["SEED_VIDEO"],
+                                  "SEED_VIDEO is not set")
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedDemo"]
+        app.launchEnvironment["SEED_VIDEO"] = video
+        app.launch()
+
+        let demo = app.staticTexts["Demo"].firstMatch
+        waitFor(demo)
+        demo.tap()
+        waitFor(app.buttons["Loop 8-count 2"], 20)
+
+        // 1. Next-move hint: in the intro, the next 8-count is 1, which has a seeded note.
+        waitFor(element(app, labelBeginsWith: "Next, 8-count 1"), 10)
+        shot("20-next-move-hint")
+
+        // 2. Practice sheet: memory test on, cues on, a new section.
+        let tools = app.buttons["Practice tools"].firstMatch
+        waitFor(tools)
+        tools.tap()
+        waitFor(app.navigationBars["Practice"].firstMatch, 10)
+        setSwitch(app, "Hide the video", on: true)
+        setSwitch(app, "Count-in", on: true)
+        setSwitch(app, "Beat click", on: true)
+        setSwitch(app, "Say the counts", on: true)
+        setSwitch(app, "Fade as I repeat", on: true)
+        sleep(4)   // time for the spoken numbers to be made
+        shot("21-practice-sheet-cues")
+
+        let newSection = app.buttons["New Section"].firstMatch
+        scrollTo(newSection, in: app)
+        newSection.tap()
+        let chorus = app.buttons["Chorus"].firstMatch
+        waitFor(chorus, 10)
+        chorus.tap()
+        shot("22-section-editor")
+        app.buttons["Save"].firstMatch.tap()
+        waitFor(app.buttons["Loop Chorus"].firstMatch, 10)
+        shot("23-section-saved")
+        app.buttons["Done"].firstMatch.tap()
+
+        // 3. Memory test: the video is covered.
+        waitFor(app.staticTexts["MEMORY TEST"].firstMatch, 10)
+        shot("24-memory-test")
+
+        // 4. Build up from 8-count 1 (memory test off first).
+        tools.tap()
+        waitFor(app.navigationBars["Practice"].firstMatch, 10)
+        setSwitch(app, "Hide the video", on: false)
+        // Reopen the sheet so it starts at the top again (swiping down
+        // could close it instead of scrolling).
+        app.buttons["Done"].firstMatch.tap()
+        sleep(1)
+        tools.tap()
+        waitFor(app.navigationBars["Practice"].firstMatch, 10)
+        let buildUp = element(app, labelBeginsWith: "Build up")
+        waitFor(buildUp, 5)
+        buildUp.tap()
+        // Step 1: one 8-count, then (after 2 runs of the loop) it must move on by itself.
+        waitFor(element(app, labelContains: "8-count 1 · run"), 15)
+        shot("25-build-up-step-1")
+        waitFor(element(app, labelContains: "8-counts 1–2 · run"), 45)
+        shot("26-build-up-step-2")
+        app.buttons["Next step"].firstMatch.tap()
+        waitFor(element(app, labelContains: "8-counts 1–3 · run"), 10)
+        app.buttons["Stop the coach"].firstMatch.tap()
+        sleep(1)
+
+        // 5. Speed ladder: starts at half speed.
+        tools.tap()
+        waitFor(app.navigationBars["Practice"].firstMatch, 10)
+        let ladder = element(app, labelBeginsWith: "Speed ladder")
+        waitFor(ladder, 5)
+        ladder.tap()
+        waitFor(element(app, labelContains: "at ½×"), 15)
+        shot("27-speed-ladder")
+        app.buttons["Stop the coach"].firstMatch.tap()
+
+        // 6. Loop the section from its header in the list.
+        let loopChorus = app.buttons["Loop Chorus"].firstMatch
+        waitFor(loopChorus, 10)
+        loopChorus.tap()
+        waitFor(app.buttons["Stop looping Chorus"].firstMatch, 10)
+        sleep(3)
+        shot("28-section-looping")
+        let pause = app.buttons["Pause"].firstMatch
+        if pause.exists { pause.tap() }
+
+        // 7. Pinch to zoom, then back to the whole video.
+        let videoView = app.otherElements["practiceVideo"].firstMatch
+        waitFor(videoView, 5)
+        videoView.pinch(withScale: 2.5, velocity: 2)
+        let unzoom = app.buttons["Zoomed in. Show the whole video"].firstMatch
+        waitFor(unzoom, 10)
+        shot("29-zoomed")
+        unzoom.tap()
+        XCTAssertTrue(unzoom.waitForNonExistence(timeout: 5), "Zoom didn't reset")
+    }
+
+    // MARK: - Helpers for the practice test
+
+    private func element(_ app: XCUIApplication, labelBeginsWith prefix: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", prefix)).firstMatch
+    }
+
+    private func element(_ app: XCUIApplication, labelContains text: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
+    }
+
+    /// Scrolls the sheet's list down until `element` can be tapped.
+    private func scrollTo(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<8 where !(element.exists && element.isHittable) {
+            app.collectionViews.firstMatch.swipeUp()
+        }
+        XCTAssertTrue(element.isHittable, "Can't scroll to \(element)")
+    }
+
+    /// Turns a Form switch on/off. SwiftUI switches react to a tap on the
+    /// switch itself, at the right edge of the row.
+    private func setSwitch(_ app: XCUIApplication, _ labelPrefix: String, on: Bool,
+                           file: StaticString = #filePath, line: UInt = #line) {
+        let toggle = app.switches.matching(NSPredicate(format: "label BEGINSWITH %@", labelPrefix)).firstMatch
+        scrollTo(toggle, in: app)
+        let wanted = on ? "1" : "0"
+        if (toggle.value as? String) != wanted {
+            toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+        }
+        let done = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", wanted), object: toggle)
+        XCTAssertEqual(XCTWaiter().wait(for: [done], timeout: 3), .completed,
+                       "Switch \(labelPrefix) didn't turn \(on ? "on" : "off")", file: file, line: line)
+    }
 }

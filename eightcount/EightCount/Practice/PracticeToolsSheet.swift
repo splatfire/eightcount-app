@@ -17,6 +17,8 @@ struct PracticeToolsSheet: View {
     let onBuildUp: (_ first: Int, _ last: Int, _ runs: Int, _ name: String?) -> Void
     let onSpeedLadder: (_ first: Int, _ last: Int, _ runs: Int, _ name: String?) -> Void
     let onLoopSection: (PracticeSection) -> Void
+    /// Whether the spoken numbers are ready yet.
+    let voiceStatus: CountCues.VoiceStatus
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -31,7 +33,8 @@ struct PracticeToolsSheet: View {
          memoryTest: Binding<Bool>, showNextMove: Binding<Bool>, cues: Binding<CountCues.Settings>,
          onBuildUp: @escaping (_ first: Int, _ last: Int, _ runs: Int, _ name: String?) -> Void,
          onSpeedLadder: @escaping (_ first: Int, _ last: Int, _ runs: Int, _ name: String?) -> Void,
-         onLoopSection: @escaping (PracticeSection) -> Void) {
+         onLoopSection: @escaping (PracticeSection) -> Void,
+         voiceStatus: CountCues.VoiceStatus) {
         self.project = project
         self.grid = grid
         self.currentIndex = currentIndex
@@ -41,6 +44,7 @@ struct PracticeToolsSheet: View {
         self.onBuildUp = onBuildUp
         self.onSpeedLadder = onSpeedLadder
         self.onLoopSection = onLoopSection
+        self.voiceStatus = voiceStatus
     }
 
     private var count: Int { grid.isValid ? grid.numberOfEightCounts : 0 }
@@ -178,11 +182,25 @@ struct PracticeToolsSheet: View {
         } header: {
             Text("Cues")
         } footer: {
-            Text(grid.isValid
-                 ? "The count-in plays before the video starts. \"Say my moves\" reads the next 8-count's note on count 5. \"Fade\" makes the cues quieter each time a loop starts over, until you dance without them."
-                 : "Set the tempo first – the cues follow the beat.")
+            VStack(alignment: .leading, spacing: 6) {
+                Text(grid.isValid
+                     ? "The count-in plays before the video starts. \"Say my moves\" reads the next 8-count's note on count 5. \"Fade\" makes the cues quieter each time a loop starts over, until you dance without them."
+                     : "Set the tempo first – the cues follow the beat.")
+                if let voiceText {
+                    Text(voiceText)
+                }
+            }
         }
         .disabled(!grid.isValid)
+    }
+
+    private var voiceText: String? {
+        switch voiceStatus {
+        case .notLoaded: return nil
+        case .loading: return "Preparing the voice…"
+        case .ready: return "Spoken counts ready."
+        case .unavailable: return "The iPhone voice isn't available – you'll hear ticks instead."
+        }
     }
 
     // MARK: - Sections
