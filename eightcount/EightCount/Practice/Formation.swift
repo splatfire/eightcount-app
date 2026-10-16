@@ -66,16 +66,24 @@ struct FormationMiniMap: View {
                     .position(x: size.width / 2, y: size.height - 2)
                 ForEach(formation.dancers) { dancer in
                     let dot: CGFloat = dancer.isMe ? 9 : 6
+                    let point = Self.point(dancer, in: size, inset: 5)
                     Circle()
                         .fill(Formation.colors[dancer.colorIndex % Formation.colors.count])
                         .overlay(Circle().strokeBorder(Color.white, lineWidth: dancer.isMe ? 1.5 : 0))
                         .frame(width: dot, height: dot)
-                        .position(x: 5 + dancer.x * (size.width - 10), y: 5 + dancer.y * (size.height - 10))
+                        .position(point)
                 }
             }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Formation with \(formation.dancers.count) dancers")
+    }
+
+    /// Stage position (0…1) → point in a view of `size`, `inset` from the edges.
+    static func point(_ dancer: Formation.Dancer, in size: CGSize, inset: CGFloat) -> CGPoint {
+        let width: CGFloat = max(size.width - 2 * inset, 1)
+        let height: CGFloat = max(size.height - 2 * inset, 1)
+        return CGPoint(x: inset + CGFloat(dancer.x) * width, y: inset + CGFloat(dancer.y) * height)
     }
 }
 
@@ -190,12 +198,16 @@ struct FormationEditorSheet: View {
                     .position(x: size.width / 2, y: size.height - 10)
                 ForEach($formation.dancers) { $dancer in
                     dancerDot(dancer)
-                        .position(x: 18 + dancer.x * (size.width - 36), y: 18 + dancer.y * (size.height - 36))
+                        .position(FormationMiniMap.point(dancer, in: size, inset: 18))
                         .gesture(
                             DragGesture(minimumDistance: 2)
                                 .onChanged { value in
-                                    dancer.x = min(max((value.location.x - 18) / max(size.width - 36, 1), 0), 1)
-                                    dancer.y = min(max((value.location.y - 18) / max(size.height - 36, 1), 0), 1)
+                                    let width: CGFloat = max(size.width - 36, 1)
+                                    let height: CGFloat = max(size.height - 36, 1)
+                                    let x = Double((value.location.x - 18) / width)
+                                    let y = Double((value.location.y - 18) / height)
+                                    dancer.x = min(max(x, 0), 1)
+                                    dancer.y = min(max(y, 0), 1)
                                     selectedID = dancer.id
                                     copiedFrom = nil
                                 }
