@@ -230,10 +230,29 @@ private struct ProjectRow: View {
                         .foregroundStyle(Theme.secondaryText)
                         .lineLimit(2)
                 }
+                if project.eightCountTotal > 0 && project.knownCount > 0 {
+                    progress
+                }
             }
             Spacer(minLength: 0)
         }
         .frame(minHeight: 72)
+    }
+
+    /// Thin bar + "5/12 learned".
+    private var progress: some View {
+        let total = project.eightCountTotal
+        let known = min(project.knownCount, total)
+        return HStack(spacing: 8) {
+            ProgressView(value: Double(known), total: Double(total))
+                .tint(Theme.known)
+                .frame(maxWidth: 120)
+            Text("\(known)/\(total) learned")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(Theme.secondaryText)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(known) of \(total) 8-counts learned")
     }
 
     /// "chorus · 120 BPM · 5 notes · 2 takes"

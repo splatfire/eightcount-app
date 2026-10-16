@@ -20,6 +20,9 @@ final class Project {
     var originalVideoName: String?
     var createdAt: Date
     var updatedAt: Date
+    /// How many 8-counts the video has (remembered from the practice
+    /// screen, so the project list can show progress without loading videos).
+    var eightCountTotal: Int = 0
 
     /// Notes for each 8-count. Deleting the project deletes its notes.
     @Relationship(deleteRule: .cascade, inverse: \CountNote.project)
@@ -58,6 +61,12 @@ final class Project {
     /// Sections in the order they happen in the dance.
     var sortedSections: [PracticeSection] {
         sections.sorted { ($0.startIndex, $0.createdAt) < ($1.startIndex, $1.createdAt) }
+    }
+
+    /// How many 8-counts are marked "Got it" (only counting real 8-counts).
+    var knownCount: Int {
+        let total = eightCountTotal
+        return notes.filter { $0.mastery == .known && (total == 0 || $0.countIndex < total) }.count
     }
 
     /// The note for 8-count `index`, if one has been written.

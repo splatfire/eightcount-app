@@ -15,6 +15,8 @@ struct CountRowView: View {
     let isCurrent: Bool
     /// True while this 8-count is being looped.
     let isLooped: Bool
+    /// How well you know it (shown under the number).
+    let mastery: Mastery
     let onJump: () -> Void
     let onToggleLoop: () -> Void
     let onEdit: () -> Void
@@ -23,6 +25,7 @@ struct CountRowView: View {
     private static let maxThumbnails = 4
 
     init(index: Int, startTime: Double, note: CountNote?, isCurrent: Bool, isLooped: Bool,
+         mastery: Mastery = .unmarked,
          onJump: @escaping () -> Void,
          onToggleLoop: @escaping () -> Void,
          onEdit: @escaping () -> Void) {
@@ -31,6 +34,7 @@ struct CountRowView: View {
         self.note = note
         self.isCurrent = isCurrent
         self.isLooped = isLooped
+        self.mastery = mastery
         self.onJump = onJump
         self.onToggleLoop = onToggleLoop
         self.onEdit = onEdit
@@ -84,10 +88,17 @@ struct CountRowView: View {
                 .foregroundStyle(Theme.secondaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
+            if mastery != .unmarked {
+                Image(systemName: mastery.symbol)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(mastery == .known ? Theme.known : Theme.learning)
+                    .padding(.top, 2)
+            }
         }
         .frame(width: 52, alignment: .leading)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("8-count \(index + 1), starts at \(formatTime(startTime))")
+        .accessibilityLabel("8-count \(index + 1), starts at \(formatTime(startTime))"
+                            + (mastery == .unmarked ? "" : ", \(mastery.title)"))
     }
 
     private var details: some View {

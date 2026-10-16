@@ -26,6 +26,8 @@ final class Take {
     var syncNudge: Double
     /// Encoded `AnalysisReport` (JSON), once analyzed.
     var analysisData: Data?
+    /// Recorded with the tutorial hidden (memory test).
+    var memoryTest: Bool = false
 
     var project: Project?
 

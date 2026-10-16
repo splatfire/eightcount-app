@@ -54,6 +54,8 @@ final class PlayerController {
     /// Plays the count-in sounds (set by the practice screen when the
     /// count-in is switched on). Nil = no count-in.
     @ObservationIgnored weak var countIn: CountInProvider?
+    /// Also count in each time the loop starts over (not only on Play).
+    @ObservationIgnored var countInOnLoop = false
     @ObservationIgnored private var countInTask: Task<Void, Never>?
 
     /// A readable error if the video could not be opened.
@@ -211,6 +213,11 @@ final class PlayerController {
             startPlayer()
             return
         }
+        waitThenPlay(wait)
+    }
+
+    /// Plays after `wait` seconds (while the count-in sounds).
+    private func waitThenPlay(_ wait: TimeInterval) {
         isCountingIn = true
         countInTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(wait))
@@ -457,6 +464,11 @@ final class PlayerController {
         if isLooping, player.timeControlStatus != .paused,
            let start = loopStart, let end = loopEnd, seconds >= end {
             loopWraps += 1
+            if countInBeforeRestart() {
+                player.pause()
+                seekPrecisely(to: start)
+                return
+            }
             seekPrecisely(to: start)
         }
     }
@@ -466,6 +478,7 @@ final class PlayerController {
             // B was at (or very near) the end of the video.
             loopWraps += 1
             seekPrecisely(to: start)
+            if countInBeforeRestart() { return }
             player.play()
         } else {
             reachedEnd = true
@@ -474,6 +487,16 @@ final class PlayerController {
             }
             setPlaying(false)
         }
+    }
+
+    /// With "count-in every loop": starts the count-in and the wait, and
+    /// returns true (the caller then pauses at A instead of playing on).
+    private func countInBeforeRestart() -> Bool {
+        guard countInOnLoop, let provider = countIn else { return false }
+        let wait = provider.startCountIn(rate: rate)
+        guard wait > 0 else { return false }
+        waitThenPlay(wait)
+        return true
     }
 
     /// Updates `isPlaying` and keeps the screen awake while playing.

@@ -170,9 +170,15 @@ private struct TakeRow: View {
                         .font(.system(.subheadline, design: .monospaced))
                         .foregroundStyle(Theme.secondaryText)
 
-                    Label(SyncedPlayback.speedLabel(take.recordRate), systemImage: "speedometer")
-                        .font(.system(.footnote, design: .rounded))
-                        .foregroundStyle(Theme.secondaryText)
+                    HStack(spacing: 10) {
+                        Label(SyncedPlayback.speedLabel(take.recordRate), systemImage: "speedometer")
+                            .foregroundStyle(Theme.secondaryText)
+                        if take.memoryTest {
+                            Label("Memory test", systemImage: "eye.slash")
+                                .foregroundStyle(Theme.accent)
+                        }
+                    }
+                    .font(.system(.footnote, design: .rounded))
                 }
 
                 Spacer(minLength: 8)

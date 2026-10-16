@@ -9,6 +9,9 @@ enum Theme {
     static let highlight = Color(red: 1.0, green: 0.30, blue: 0.40).opacity(0.22)
     static let loopColor = Color(red: 0.35, green: 0.80, blue: 1.0)   // A-B / loop
     static let secondaryText = Color(white: 0.62)
+    /// Progress marks: "Got it" and "Still learning".
+    static let known = Color(red: 0.35, green: 0.85, blue: 0.50)
+    static let learning = Color(red: 1.0, green: 0.72, blue: 0.25)
 
     /// Minimum height for tappable controls. Apple recommends 44 pt; we go
     /// bigger because the phone is often on a stand away from you.

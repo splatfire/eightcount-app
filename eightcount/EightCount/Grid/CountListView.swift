@@ -24,6 +24,8 @@ struct CountListView: View {
     let onLoopSection: (PracticeSection) -> Void
     /// Long-press menu: "New section from here".
     let onNewSection: (Int) -> Void
+    /// Long-press menu: "Got it" / "Still learning" / clear.
+    let onSetMastery: (Int, Mastery) -> Void
 
     init(project: Project, grid: CountGrid, currentIndex: Int?, loopedRange: ClosedRange<Int>?,
          sections: [PracticeSection], loopedSectionID: UUID?, followPlayback: Bool,
@@ -32,7 +34,8 @@ struct CountListView: View {
          onEdit: @escaping (Int) -> Void,
          onSetupTempo: @escaping () -> Void,
          onLoopSection: @escaping (PracticeSection) -> Void,
-         onNewSection: @escaping (Int) -> Void) {
+         onNewSection: @escaping (Int) -> Void,
+         onSetMastery: @escaping (Int, Mastery) -> Void) {
         self.project = project
         self.grid = grid
         self.currentIndex = currentIndex
@@ -46,6 +49,7 @@ struct CountListView: View {
         self.onSetupTempo = onSetupTempo
         self.onLoopSection = onLoopSection
         self.onNewSection = onNewSection
+        self.onSetMastery = onSetMastery
     }
 
     var body: some View {
@@ -57,6 +61,9 @@ struct CountListView: View {
                 LazyVStack(spacing: 10) {
                     if grid.bpm > 0 {
                         tempoChip
+                    }
+                    if grid.isValid && grid.numberOfEightCounts > 0 {
+                        progressBar(notesByIndex)
                     }
                     rows(notesByIndex)
                 }
@@ -134,11 +141,22 @@ struct CountListView: View {
                     note: notesByIndex[index],
                     isCurrent: currentIndex == index,
                     isLooped: loopedRange?.contains(index) ?? false,
+                    mastery: notesByIndex[index]?.mastery ?? .unmarked,
                     onJump: { onJump(index) },
                     onToggleLoop: { onToggleLoop(index) },
                     onEdit: { onEdit(index) }
                 )
                 .contextMenu {
+                    let current = notesByIndex[index]?.mastery ?? .unmarked
+                    ForEach([Mastery.known, .learning], id: \.self) { level in
+                        Button {
+                            onSetMastery(index, current == level ? .unmarked : level)
+                        } label: {
+                            Label(current == level ? "Clear \"\(level.title)\"" : level.title,
+                                  systemImage: level.symbol)
+                        }
+                    }
+                    Divider()
                     Button {
                         onNewSection(index)
                     } label: {
@@ -167,6 +185,45 @@ struct CountListView: View {
                 buttonTitle: "Set Tempo"
             )
         }
+    }
+
+    /// "Got it: 5 of 12" with a bar, plus how many are still being learned.
+    /// Mark 8-counts with a long press (or after a memory test).
+    private func progressBar(_ notesByIndex: [Int: CountNote]) -> some View {
+        let total = grid.numberOfEightCounts
+        let known = (0..<total).filter { notesByIndex[$0]?.mastery == .known }.count
+        let learning = (0..<total).filter { notesByIndex[$0]?.mastery == .learning }.count
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(known == total ? "You know the whole dance!" : "Got it: \(known) of \(total)")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                if learning > 0 {
+                    Label("\(learning) still learning", systemImage: Mastery.learning.symbol)
+                        .font(.caption)
+                        .foregroundStyle(Theme.learning)
+                }
+            }
+            GeometryReader { geo in
+                let width = geo.size.width
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.white.opacity(0.1))
+                    Capsule().fill(Theme.learning.opacity(0.6))
+                        .frame(width: width * CGFloat(known + learning) / CGFloat(max(total, 1)))
+                    Capsule().fill(Theme.known)
+                        .frame(width: width * CGFloat(known) / CGFloat(max(total, 1)))
+                }
+            }
+            .frame(height: 6)
+            if known + learning == 0 {
+                Text("Long-press an 8-count to mark it \"Got it\".")
+                    .font(.caption)
+                    .foregroundStyle(Theme.secondaryText)
+            }
+        }
+        .padding(.horizontal, 4)
+        .accessibilityElement(children: .combine)
+        .animation(.snappy, value: known)
     }
 
     /// "CHORUS · 8-counts 9–16  ⟳" above a section's first 8-count.

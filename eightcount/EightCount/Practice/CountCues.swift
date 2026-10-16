@@ -23,6 +23,8 @@ final class CountCues: CountInProvider {
 
     struct Settings: Equatable {
         var countIn = false
+        /// Count in again each time a loop starts over.
+        var countInEveryLoop = false
         var click = false
         var sayCounts = false
         var sayMoves = false

@@ -19,6 +19,8 @@ struct RecordView: View {
     let rate: Double
     /// Show the tutorial flipped, like a mirror.
     let tutorialMirrored: Bool
+    /// Start with the tutorial hidden (memory test).
+    let startHidden: Bool
     /// Called with nil when the screen is closed without a take (X, "Done",
     /// discarded). A saved take is reviewed right here (instant replay), and
     /// closing that review dismisses the cover by itself, so this is not
@@ -36,15 +38,22 @@ struct RecordView: View {
     @State private var watchID = UUID()
     /// Beeps with the 3-2-1 (also read by the record flow from UserDefaults).
     @AppStorage("countdownSound") private var countdownSound = true
+    /// Memory test: the tutorial is hidden (its music still plays) and only
+    /// the count is shown. The take is marked as a memory test.
+    @State private var hideTutorial = false
+    /// The memory-test take whose forgotten 8-counts you're marking.
+    @State private var markingTake: MemoryMarkTarget?
 
     init(project: Project, startTime: Double, endTime: Double?, rate: Double,
-         tutorialMirrored: Bool, onFinished: @escaping (Take?) -> Void) {
+         tutorialMirrored: Bool, startHidden: Bool = false, onFinished: @escaping (Take?) -> Void) {
         self.project = project
         self.startTime = max(startTime, 0)
         self.endTime = endTime
         self.rate = min(max(rate, 0.25), 1)
         self.tutorialMirrored = tutorialMirrored
+        self.startHidden = startHidden
         self.onFinished = onFinished
+        _hideTutorial = State(initialValue: startHidden)
     }
 
     // MARK: - Body
@@ -87,6 +96,21 @@ struct RecordView: View {
             model.end()
             OrientationLock.portraitOnly()
             UIApplication.shared.isIdleTimerDisabled = false
+        }
+        .onChange(of: hideTutorial, initial: true) { _, hidden in
+            model.memoryTest = hidden
+        }
+        // A memory test was just saved: ask which 8-counts you forgot.
+        .onChange(of: model.reviewTake?.id) { _, _ in
+            if let take = model.reviewTake, take.memoryTest,
+               CountGrid(bpm: project.bpm, offset: project.offset, duration: .greatestFiniteMagnitude).isValid {
+                markingTake = MemoryMarkTarget(take: take)
+            }
+        }
+        .sheet(item: $markingTake) { target in
+            MemoryResultSheet(project: project, take: target.take)
+                .presentationDetents([.medium, .large])
+                .presentationBackgroundInteraction(.enabled(upThrough: .medium))
         }
         .onChange(of: model.recorder.errorMessage) { _, newValue in
             if let newValue { model.errorMessage = newValue }
@@ -206,7 +230,7 @@ struct RecordView: View {
                     .frame(width: rects.tutorial.width, height: rects.tutorial.height)
                     // Only the tutorial picture is flipped, not the badge.
                     .scaleEffect(x: tutorialMirrored ? -1 : 1, y: 1)
-                    .opacity(ghost ? ghostOpacity : 1)
+                    .opacity(hideTutorial ? 0 : (ghost ? ghostOpacity : 1))
                     .overlay {
                         if let error = model.tutorial.loadError {
                             Label(error, systemImage: "exclamationmark.triangle")
@@ -217,8 +241,13 @@ struct RecordView: View {
                         }
                     }
                     .overlay(alignment: .topLeading) {
-                        if !ghost {
+                        if !ghost && !hideTutorial {
                             badge("TUTORIAL", top: landscape ? belowButtons : 10, leading: 10)
+                        }
+                    }
+                    .overlay {
+                        if hideTutorial {
+                            memoryCount(compact: ghost)
                         }
                     }
                     .position(x: rects.tutorial.midX, y: rects.tutorial.midY)
@@ -228,6 +257,40 @@ struct RecordView: View {
             .animation(.snappy(duration: 0.3), value: layout)
         }
         .ignoresSafeArea()
+    }
+
+    /// Memory test: the count instead of the tutorial picture.
+    private func memoryCount(compact: Bool) -> some View {
+        TimelineView(.animation(minimumInterval: 0.05)) { _ in
+            let grid = CountGrid(bpm: project.bpm, offset: project.offset, duration: .greatestFiniteMagnitude)
+            let time = model.tutorial.currentSeconds()
+            let playing = model.phase == .recording
+            VStack(spacing: 4) {
+                Text("MEMORY TEST")
+                    .font(.system(.caption2, design: .rounded).weight(.bold))
+                    .tracking(1.2)
+                    .foregroundStyle(Theme.accent)
+                if grid.isValid && playing, let beat = grid.beat(at: time) {
+                    Text("\(beat)")
+                        .font(.system(size: compact ? 44 : 72, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(Color.white)
+                    Text(grid.index(at: time).map { "8-count \($0 + 1)" } ?? "")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Theme.secondaryText)
+                } else if !playing {
+                    Text("The tutorial is hidden.\nDance it from memory.")
+                        .font(.subheadline.weight(.semibold))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(Color.white)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.black.opacity(compact ? 0.45 : 0.75)))
+        }
+        .accessibilityElement(children: .combine)
     }
 
     /// Small translucent capsule inside a picture ("YOU" / "TUTORIAL").
@@ -300,6 +363,17 @@ struct RecordView: View {
                     .buttonStyle(.round(size: 40))
                     .accessibilityLabel("Countdown sound")
                     .accessibilityValue(countdownSound ? "On" : "Off")
+
+                    Button {
+                        hideTutorial.toggle()
+                    } label: {
+                        Image(systemName: hideTutorial ? "eye.slash.fill" : "eye")
+                    }
+                    .buttonStyle(.round(size: 40, isOn: hideTutorial, tint: Theme.accent))
+                    .disabled(model.isLayoutLocked)
+                    .opacity(model.isLayoutLocked ? 0.4 : 1)
+                    .accessibilityLabel("Memory test")
+                    .accessibilityValue(hideTutorial ? "On, tutorial hidden" : "Off")
 
                     Button {
                         layout = (layout == .ghost) ? .sideBySide : .ghost
@@ -585,6 +659,12 @@ private struct RecordCapsuleGlass: ViewModifier {
 ///
 /// Kept out of the view so closures and timers have a stable object to talk
 /// to (a SwiftUI view is a throw-away value).
+/// Wraps a take for `.sheet(item:)`.
+private struct MemoryMarkTarget: Identifiable {
+    let take: Take
+    var id: PersistentIdentifier { take.persistentModelID }
+}
+
 @MainActor
 @Observable
 private final class RecordSessionModel {
@@ -614,6 +694,8 @@ private final class RecordSessionModel {
 
     let recorder = CameraRecorder()
     let tutorial = RecordTutorialPlayer()
+    /// The tutorial is hidden: the take is saved as a memory test.
+    var memoryTest = false
     /// Beeps of the 3-2-1.
     private let sounds = CountdownSounds()
 
@@ -856,6 +938,10 @@ private final class RecordSessionModel {
                 to: project,
                 context: context
             )
+            if memoryTest {
+                take.memoryTest = true
+                try? context.save()
+            }
             savedTake = take
             phase = .saved
             // Reviewing: the camera is not needed (saves battery). The

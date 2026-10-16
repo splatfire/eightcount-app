@@ -38,6 +38,18 @@ enum NoteStore {
         return snapshot
     }
 
+    /// Marks how well you know 8-count `index` (creates its note if needed;
+    /// removes an otherwise empty note when the mark is cleared).
+    @MainActor
+    static func setMastery(_ mastery: Mastery, for index: Int, in project: Project, context: ModelContext) {
+        let note = Self.note(for: index, in: project, context: context)
+        note.mastery = mastery
+        note.updatedAt = .now
+        project.updatedAt = .now
+        try? context.save()
+        if mastery == .unmarked { deleteIfEmpty(note, context: context) }
+    }
+
     /// Deletes one snapshot (ask the user first!).
     @MainActor
     static func delete(_ snapshot: PoseSnapshot, context: ModelContext) {

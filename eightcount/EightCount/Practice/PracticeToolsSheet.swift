@@ -167,6 +167,11 @@ struct PracticeToolsSheet: View {
             Toggle(isOn: $cues.countIn) {
                 Label("Count-in \"5, 6, 7, 8\"", systemImage: "megaphone")
             }
+            if cues.countIn {
+                Toggle(isOn: $cues.countInEveryLoop) {
+                    Label("Before every loop too", systemImage: "repeat")
+                }
+            }
             Toggle(isOn: $cues.click) {
                 Label("Beat click", systemImage: "metronome")
             }

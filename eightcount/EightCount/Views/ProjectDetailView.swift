@@ -53,6 +53,7 @@ struct ProjectDetailView: View {
     @State private var peeking = false
     @AppStorage("showNextMove") private var showNextMove = true
     @AppStorage("cueCountIn") private var cueCountIn = false
+    @AppStorage("cueCountInLoop") private var cueCountInLoop = false
     @AppStorage("cueClick") private var cueClick = false
     @AppStorage("cueSayCounts") private var cueSayCounts = false
     @AppStorage("cueSayMoves") private var cueSayMoves = false
@@ -98,7 +99,10 @@ struct ProjectDetailView: View {
             controller.tearDown()
         }
         .onChange(of: cueSettings) { _, _ in updateCues() }
-        .onChange(of: grid) { _, _ in updateCues() }
+        .onChange(of: grid) { _, _ in
+            updateCues()
+            rememberEightCountTotal()
+        }
         // The coach moves on after enough runs of the loop…
         .onChange(of: controller.loopWraps) { _, _ in
             coach.loopWrapped(controller: controller, grid: grid)
@@ -326,6 +330,9 @@ struct ProjectDetailView: View {
                     onNewSection: { index in
                         newSection = SectionDraft(start: index,
                                                   end: min(index + 3, max(grid.numberOfEightCounts - 1, 0)))
+                    },
+                    onSetMastery: { index, mastery in
+                        NoteStore.setMastery(mastery, for: index, in: project, context: modelContext)
                     }
                 )
             }
@@ -371,8 +378,8 @@ struct ProjectDetailView: View {
     }
 
     private var cueSettings: CountCues.Settings {
-        CountCues.Settings(countIn: cueCountIn, click: cueClick, sayCounts: cueSayCounts,
-                           sayMoves: cueSayMoves, fade: cueFade)
+        CountCues.Settings(countIn: cueCountIn, countInEveryLoop: cueCountInLoop, click: cueClick,
+                           sayCounts: cueSayCounts, sayMoves: cueSayMoves, fade: cueFade)
     }
 
     private var cueSettingsBinding: Binding<CountCues.Settings> {
@@ -380,6 +387,7 @@ struct ProjectDetailView: View {
             get: { cueSettings },
             set: { new in
                 cueCountIn = new.countIn
+                cueCountInLoop = new.countInEveryLoop
                 cueClick = new.click
                 cueSayCounts = new.sayCounts
                 cueSayMoves = new.sayMoves
@@ -389,9 +397,18 @@ struct ProjectDetailView: View {
     }
 
     private func updateCues() {
+        controller.countInOnLoop = cueCountIn && cueCountInLoop
         cues.update(settings: cueSettings, grid: grid) { [project] index in
             NextMoveHint.text(of: project.note(for: index))
         }
+    }
+
+    /// Stores how many 8-counts there are, for the progress bar in the project list.
+    private func rememberEightCountTotal() {
+        let total = grid.isValid ? grid.numberOfEightCounts : 0
+        guard total > 0, project.eightCountTotal != total else { return }
+        project.eightCountTotal = total
+        try? modelContext.save()
     }
 
     /// Loops a whole section (or stops it if it's already looping).
@@ -548,6 +565,7 @@ struct ProjectDetailView: View {
             endTime: end,
             rate: Double(controller.rate),
             tutorialMirrored: controller.isMirrored,
+            startHidden: memoryTest,
             onFinished: { take in
                 pendingCompare = take   // opened after the cover has closed
                 showRecord = false

@@ -16,6 +16,11 @@ final class CountNote {
     /// The lyric you hear at the start of this 8-count.
     var lyric: String
     var updatedAt: Date
+    /// How well you know this 8-count: see `Mastery`. Stored as a number so
+    /// new levels can be added later.
+    var masteryRaw: Int = 0
+    /// Where everyone stands in this 8-count (JSON of `Formation`), if drawn.
+    var formationData: Data?
 
     var project: Project?
 
@@ -39,10 +44,42 @@ final class CountNote {
         snapshots.sorted { $0.time < $1.time }
     }
 
-    /// True when nothing has been written and there are no snapshots.
+    var mastery: Mastery {
+        get { Mastery(rawValue: masteryRaw) ?? Mastery.unmarked }
+        set { masteryRaw = newValue.rawValue }
+    }
+
+    /// True when nothing has been written, there are no snapshots, no
+    /// progress mark and no formation.
     var isEmpty: Bool {
         [text, feet, arms, facing, lyric].allSatisfy {
             $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        } && snapshots.isEmpty
+        } && snapshots.isEmpty && masteryRaw == 0 && formationData == nil
+    }
+}
+
+/// How well you know an 8-count.
+enum Mastery: Int, CaseIterable, Codable {
+    /// Not marked yet.
+    case unmarked = 0
+    /// Still learning / forgot it in a memory test.
+    case learning = 1
+    /// Got it.
+    case known = 2
+
+    var title: String {
+        switch self {
+        case .unmarked: return "Not marked"
+        case .learning: return "Still learning"
+        case .known: return "Got it"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .unmarked: return "circle"
+        case .learning: return "circle.lefthalf.filled"
+        case .known: return "checkmark.circle.fill"
+        }
     }
 }

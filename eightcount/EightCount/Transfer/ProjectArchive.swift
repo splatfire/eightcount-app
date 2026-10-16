@@ -51,6 +51,10 @@ enum ProjectArchive {
         var facing: String
         var lyric: String
         var snapshots: [ExportSnapshot]
+        /// Progress mark (`Mastery` raw value). Optional: older files don't have it.
+        var mastery: Int? = nil
+        /// Formation (JSON of `Formation`). Optional: older files don't have it.
+        var formation: Data? = nil
     }
 
     /// One pose picture.
@@ -117,7 +121,9 @@ enum ProjectArchive {
                         ExportSnapshot(time: finiteOrZero(snap.time),
                                        createdAt: snap.createdAt,
                                        jpeg: snap.imageData)
-                    }
+                    },
+                    mastery: note.masteryRaw == 0 ? nil : note.masteryRaw,
+                    formation: note.formationData
                 )
             }
 
@@ -267,6 +273,8 @@ enum ProjectArchive {
                                  arms: exportNote.arms,
                                  facing: exportNote.facing,
                                  lyric: exportNote.lyric)
+            note.masteryRaw = exportNote.mastery ?? 0
+            note.formationData = exportNote.formation
             context.insert(note)
             note.project = project
 
