@@ -349,11 +349,18 @@ final class EightCountUITests: XCTestCase {
         shot("30b-menu")
         let formationItem = app.buttons["Formation…"].firstMatch
         XCTAssertTrue(poll(formationItem, seconds: 20), "No Formation… menu item")
-        formationItem.tap()
-        sleep(3)
-        shot("30c-formation-opened")
         let addDancer = app.buttons["Add dancer"].firstMatch
-        XCTAssertTrue(poll(addDancer, seconds: 30), "Formation editor didn't open")
+        // A plain .tap() on a context-menu item sometimes doesn't land in the
+        // CI Simulator; tap the item's on-screen spot, and retry.
+        for _ in 0..<3 where !addDancer.exists {
+            let items = app.buttons.matching(identifier: "Formation…").allElementsBoundByIndex
+            if let item = items.first(where: { $0.isHittable }) ?? items.first {
+                item.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            }
+            _ = poll(addDancer, seconds: 8)
+        }
+        shot("30c-formation-opened")
+        XCTAssertTrue(addDancer.exists, "Formation editor didn't open")
         addDancer.tap()
         sleep(1)
         addDancer.tap()
