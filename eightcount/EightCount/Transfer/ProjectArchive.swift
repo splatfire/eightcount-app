@@ -10,8 +10,10 @@ import SwiftData
 /// (`JSONEncoder` does that automatically for `Data`).
 ///
 /// Design choice: the file is plain `.json` (named "….eightcount.json"), not
-/// a custom file type. That way we don't need to declare our own UTType in
-/// Info.plist, and the Files app / AirDrop / Messages all handle it fine.
+/// a custom file type. That way we don't need to declare our own UTType, and
+/// the Files app / AirDrop / Messages all handle it fine. Info.plist offers
+/// the app for JSON files (as an "alternate", never the default), so a shared
+/// file can be opened straight into EightCount (`onOpenURL` in the list).
 enum ProjectArchive {
 
     // MARK: - File format (plain value types, separate from the @Model classes)

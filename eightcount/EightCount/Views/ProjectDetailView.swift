@@ -38,6 +38,8 @@ struct ProjectDetailView: View {
     @State private var loadedFileName: String?
     /// Identifies this screen to the Apple Watch remote.
     @State private var watchID = UUID()
+    /// False while another screen covers this one (or after going back).
+    @State private var isOnScreen = false
     /// Big video: the video takes most of the screen and the 8-count list
     /// gets smaller. Remembered between launches.
     @AppStorage("bigVideo") private var bigVideo = false
@@ -92,8 +94,19 @@ struct ProjectDetailView: View {
             WatchRemoteHandlers.attachPractice(id: watchID, project: project, controller: controller)
             cues.start(controller: controller)
             updateCues()
+            // The practice screen can turn sideways too. A record/compare
+            // screen closing locks to portrait when it goes; unlock again
+            // just after that.
+            isOnScreen = true
+            OrientationLock.allowLandscape()
+            Task {
+                try? await Task.sleep(for: .milliseconds(400))
+                if isOnScreen { OrientationLock.allowLandscape() }
+            }
         }
         .onDisappear {
+            isOnScreen = false
+            OrientationLock.portraitOnly()
             WatchRemote.shared.detach(id: watchID)
             cues.stop()
             controller.tearDown()
@@ -187,157 +200,190 @@ struct ProjectDetailView: View {
 
     private var practiceView: some View {
         GeometryReader { geo in
-            VStack(spacing: 0) {
-                // Video: a rounded card with 16 pt side padding, never taller
-                // than ~40% of the available height, so the controls and the
-                // 8-count list still fit.
-                let aspect = max(controller.videoAspectRatio, 0.1)
-                let videoWidth = max(geo.size.width - 32, 0)
-                let videoHeight = min(videoWidth / aspect, geo.size.height * (bigVideo ? 0.62 : 0.34))
-
-                let videoSize = CGSize(width: videoWidth, height: videoHeight)
-
-                VideoSurface(controller: controller, zoom: zoom.scale, pan: zoom.offset)
-                    .frame(width: videoWidth, height: videoHeight)
-                    .overlay {
-                        // Short white flash = "snapshot taken".
-                        Color.white.opacity(flash ? 0.6 : 0)
-                            .allowsHitTesting(false)
+            if geo.size.width > geo.size.height {
+                // Sideways: video and controls on the left, the 8-counts on the right.
+                let leftWidth = (geo.size.width * 0.6).rounded()
+                HStack(spacing: 0) {
+                    VStack(spacing: 0) {
+                        videoCard(available: CGSize(width: leftWidth - 24, height: max(geo.size.height - 190, 120)),
+                                  fitWidth: true)
+                        coachBarIfNeeded
+                        Spacer(minLength: 0)
+                        playbackControls
                     }
-                    .overlay {
-                        if memoryTest {
-                            MemoryTestCover(controller: controller, grid: grid, isPeeking: $peeking)
-                                .transition(.opacity)
-                        }
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous))
-                    // For the UI test (pinch zoom).
-                    .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier("practiceVideo")
-                    // Double-tap the video, or tap the corner button, to make it bigger/smaller.
-                    .onTapGesture(count: 2) { toggleBigVideo() }
-                    // Pinch to zoom in on the feet / hands; drag to look around.
-                    .gesture(
-                        MagnifyGesture()
-                            .onChanged { zoom.pinch($0.magnification, in: videoSize) }
-                            .onEnded { _ in withAnimation(.snappy) { zoom.settle(in: videoSize) } }
-                    )
-                    .simultaneousGesture(
-                        DragGesture(minimumDistance: 6)
-                            .onChanged { zoom.drag($0.translation, in: videoSize) }
-                            .onEnded { _ in zoom.settle(in: videoSize) },
-                        including: zoom.isZoomed ? .all : .subviews
-                    )
-                    .overlay(alignment: .bottomTrailing) {
-                        Button { toggleBigVideo() } label: {
-                            Image(systemName: bigVideo ? "arrow.down.right.and.arrow.up.left"
-                                                       : "arrow.up.left.and.arrow.down.right")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(Color.white)
-                                .frame(width: 36, height: 36)
-                                .glassSurface(Circle(), fallback: Color.black.opacity(0.55))
-                        }
-                        .buttonStyle(.plain)
-                        .padding(8)
-                        .accessibilityLabel(bigVideo ? "Smaller video" : "Bigger video")
-                    }
-                    .overlay(alignment: .topLeading) {
-                        Button { showTools = true } label: {
-                            Image(systemName: "figure.dance")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(coach.isActive || memoryTest ? Theme.accent : Color.white)
-                                .frame(width: 36, height: 36)
-                                .glassSurface(Circle(), fallback: Color.black.opacity(0.55))
-                        }
-                        .buttonStyle(.plain)
-                        .padding(8)
-                        .accessibilityLabel("Practice tools")
-                    }
-                    .overlay(alignment: .top) {
-                        if zoom.isZoomed {
-                            Button {
-                                withAnimation(.snappy) { zoom.reset() }
-                            } label: {
-                                Label(String(format: "%.1f×", zoom.scale), systemImage: "xmark")
-                                    .font(.caption.weight(.semibold).monospacedDigit())
-                                    .foregroundStyle(Color.white)
-                                    .padding(.horizontal, 10)
-                                    .frame(height: 30)
-                                    .glassSurface(Capsule(), fallback: Color.black.opacity(0.55))
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.top, 11)
-                            .accessibilityLabel("Zoomed in. Show the whole video")
-                        }
-                    }
-                    .overlay(alignment: .bottomLeading) {
-                        if let hint = nextMove {
-                            NextMoveHint(index: hint.index, text: hint.text)
-                                .padding(.leading, 8)
-                                .padding(.trailing, 52)
-                                .padding(.bottom, 8)
-                                .transition(.opacity)
-                                .allowsHitTesting(false)
-                        }
-                    }
-                    .animation(.snappy, value: nextMove?.index)
-                    .animation(.easeInOut(duration: 0.2), value: memoryTest)
-                    .padding(.top, 6)
-                    .background(
-                        PlayheadTracker(
-                            controller: controller,
-                            grid: grid,
-                            currentIndex: $currentIndex,
-                            countLabel: $countLabel
-                        )
-                    )
-
-                if coach.isActive || fadingCueLevel != nil {
-                    CoachBar(
-                        coach: coach,
-                        cueLevel: fadingCueLevel,
-                        onNext: { coach.next(controller: controller, grid: grid) },
-                        onRestart: { coach.restart(controller: controller, grid: grid) },
-                        onStop: { coach.stop() }
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .frame(width: leftWidth)
+                    Divider().overlay(Theme.hairline)
+                    countList
                 }
-
-                PlaybackControlsView(
-                    controller: controller,
-                    countLabel: countLabel,
-                    onSnapshot: { takeSnapshot() }
-                )
-                .padding(.vertical, Theme.spacingM)
-
-                Divider().overlay(Theme.hairline)
-
-                CountListView(
-                    project: project,
-                    grid: grid,
-                    currentIndex: currentIndex,
-                    loopedRange: loopedRange,
-                    sections: project.sortedSections,
-                    loopedSectionID: loopedSectionID,
-                    followPlayback: followPlayback && controller.isPlaying,
-                    onJump: { jump(to: $0) },
-                    onToggleLoop: { toggleLoop($0) },
-                    onEdit: { editing = EditTarget(id: $0) },
-                    onSetupTempo: { showTempo = true },
-                    onLoopSection: { loopSection($0) },
-                    onNewSection: { index in
-                        newSection = SectionDraft(start: index,
-                                                  end: min(index + 3, max(grid.numberOfEightCounts - 1, 0)))
-                    },
-                    onSetMastery: { index, mastery in
-                        NoteStore.setMastery(mastery, for: index, in: project, context: modelContext)
-                    }
-                )
+                .animation(.snappy, value: coach.isActive)
+            } else {
+                VStack(spacing: 0) {
+                    // Video: a rounded card with 16 pt side padding, never taller
+                    // than ~1/3 of the screen (2/3 with "bigger video"), so the
+                    // controls and the 8-count list still fit.
+                    videoCard(available: CGSize(width: max(geo.size.width - 32, 0),
+                                                height: geo.size.height * (bigVideo ? 0.62 : 0.34)),
+                              fitWidth: false)
+                    coachBarIfNeeded
+                    playbackControls
+                    Divider().overlay(Theme.hairline)
+                    countList
+                }
+                .animation(.snappy, value: coach.isActive)
             }
-            .animation(.snappy, value: coach.isActive)
         }
+    }
+
+    /// The video with everything on it (tools, zoom, hints, memory test).
+    /// `fitWidth`: shrink the card to the video's shape (landscape layout).
+    private func videoCard(available: CGSize, fitWidth: Bool) -> some View {
+        let aspect = max(controller.videoAspectRatio, 0.1)
+        let videoHeight = min(available.width / aspect, available.height)
+        let videoWidth = fitWidth ? min(available.width, videoHeight * aspect) : available.width
+        let videoSize = CGSize(width: videoWidth, height: videoHeight)
+        return VideoSurface(controller: controller, zoom: zoom.scale, pan: zoom.offset)
+            .frame(width: videoWidth, height: videoHeight)
+            .overlay {
+                // Short white flash = "snapshot taken".
+                Color.white.opacity(flash ? 0.6 : 0)
+                    .allowsHitTesting(false)
+            }
+            .overlay {
+                if memoryTest {
+                    MemoryTestCover(controller: controller, grid: grid, isPeeking: $peeking)
+                        .transition(.opacity)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous))
+            // For the UI test (pinch zoom).
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("practiceVideo")
+            // Double-tap the video, or tap the corner button, to make it bigger/smaller.
+            .onTapGesture(count: 2) { toggleBigVideo() }
+            // Pinch to zoom in on the feet / hands; drag to look around.
+            .gesture(
+                MagnifyGesture()
+                    .onChanged { zoom.pinch($0.magnification, in: videoSize) }
+                    .onEnded { _ in withAnimation(.snappy) { zoom.settle(in: videoSize) } }
+            )
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 6)
+                    .onChanged { zoom.drag($0.translation, in: videoSize) }
+                    .onEnded { _ in zoom.settle(in: videoSize) },
+                including: zoom.isZoomed ? .all : .subviews
+            )
+            .overlay(alignment: .bottomTrailing) {
+                Button { toggleBigVideo() } label: {
+                    Image(systemName: bigVideo ? "arrow.down.right.and.arrow.up.left"
+                                               : "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.white)
+                        .frame(width: 36, height: 36)
+                        .glassSurface(Circle(), fallback: Color.black.opacity(0.55))
+                }
+                .buttonStyle(.plain)
+                .padding(8)
+                .accessibilityLabel(bigVideo ? "Smaller video" : "Bigger video")
+            }
+            .overlay(alignment: .topLeading) {
+                Button { showTools = true } label: {
+                    Image(systemName: "figure.dance")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(coach.isActive || memoryTest ? Theme.accent : Color.white)
+                        .frame(width: 36, height: 36)
+                        .glassSurface(Circle(), fallback: Color.black.opacity(0.55))
+                }
+                .buttonStyle(.plain)
+                .padding(8)
+                .accessibilityLabel("Practice tools")
+            }
+            .overlay(alignment: .top) {
+                if zoom.isZoomed {
+                    Button {
+                        withAnimation(.snappy) { zoom.reset() }
+                    } label: {
+                        Label(String(format: "%.1f×", zoom.scale), systemImage: "xmark")
+                            .font(.caption.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(Color.white)
+                            .padding(.horizontal, 10)
+                            .frame(height: 30)
+                            .glassSurface(Capsule(), fallback: Color.black.opacity(0.55))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 11)
+                    .accessibilityLabel("Zoomed in. Show the whole video")
+                }
+            }
+            .overlay(alignment: .bottomLeading) {
+                if let hint = nextMove {
+                    NextMoveHint(index: hint.index, text: hint.text)
+                        .padding(.leading, 8)
+                        .padding(.trailing, 52)
+                        .padding(.bottom, 8)
+                        .transition(.opacity)
+                        .allowsHitTesting(false)
+                }
+            }
+            .animation(.snappy, value: nextMove?.index)
+            .animation(.easeInOut(duration: 0.2), value: memoryTest)
+            .padding(.top, 6)
+            .background(
+                PlayheadTracker(
+                    controller: controller,
+                    grid: grid,
+                    currentIndex: $currentIndex,
+                    countLabel: $countLabel
+                )
+            )
+    }
+
+    @ViewBuilder
+    private var coachBarIfNeeded: some View {
+        if coach.isActive || fadingCueLevel != nil {
+            CoachBar(
+                coach: coach,
+                cueLevel: fadingCueLevel,
+                onNext: { coach.next(controller: controller, grid: grid) },
+                onRestart: { coach.restart(controller: controller, grid: grid) },
+                onStop: { coach.stop() }
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
+    }
+
+    private var playbackControls: some View {
+        PlaybackControlsView(
+            controller: controller,
+            countLabel: countLabel,
+            onSnapshot: { takeSnapshot() }
+        )
+        .padding(.vertical, Theme.spacingM)
+    }
+
+    private var countList: some View {
+        CountListView(
+            project: project,
+            grid: grid,
+            currentIndex: currentIndex,
+            loopedRange: loopedRange,
+            sections: project.sortedSections,
+            loopedSectionID: loopedSectionID,
+            followPlayback: followPlayback && controller.isPlaying,
+            onJump: { jump(to: $0) },
+            onToggleLoop: { toggleLoop($0) },
+            onEdit: { editing = EditTarget(id: $0) },
+            onSetupTempo: { showTempo = true },
+            onLoopSection: { loopSection($0) },
+            onNewSection: { index in
+                newSection = SectionDraft(start: index,
+                                          end: min(index + 3, max(grid.numberOfEightCounts - 1, 0)))
+            },
+            onSetMastery: { index, mastery in
+                NoteStore.setMastery(mastery, for: index, in: project, context: modelContext)
+            }
+        )
     }
 
     // MARK: - Practice tools

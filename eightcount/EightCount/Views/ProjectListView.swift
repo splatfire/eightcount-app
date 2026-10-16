@@ -56,6 +56,21 @@ struct ProjectListView: View {
                 path.append(project)   // open the new project right away
             }
         }
+        // A project file opened from AirDrop, Messages, Mail or Files
+        // ("Open in EightCount" / share sheet).
+        .onOpenURL { url in
+            guard url.isFileURL else { return }
+            do {
+                let project = try ProjectArchive.importProject(from: url, into: modelContext)
+                path = [project]
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            // Files handed over by other apps are copied into our Inbox folder: tidy up.
+            if url.path(percentEncoded: false).contains("/Inbox/") {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
         // Import a project file that was exported from this app.
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json]) { result in
             switch result {
