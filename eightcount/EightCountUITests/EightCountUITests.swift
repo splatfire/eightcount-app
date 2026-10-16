@@ -297,16 +297,25 @@ final class EightCountUITests: XCTestCase {
         shot("27-speed-ladder")
         app.buttons["Stop the coach"].firstMatch.tap()
 
-        // 6. Loop the section from its header in the list. (The ladder above
-        //    looped 8-counts 1–4, which IS the Chorus, so its header may
-        //    already say "Looping": switch that off first.)
-        let stopChorus = app.buttons["Stop looping Chorus"].firstMatch
-        if stopChorus.waitForExistence(timeout: 3) { stopChorus.tap() }
+        // 6. The section's Loop button in the list toggles. (The ladder above
+        //    looped 8-counts 1–4, which IS the Chorus, so it may already say
+        //    "Looping" – then tapping it must stop the loop instead.)
         let loopChorus = app.buttons["Loop Chorus"].firstMatch
-        waitFor(loopChorus, 10)
-        loopChorus.tap()
-        waitFor(app.buttons["Stop looping Chorus"].firstMatch, 10)
-        sleep(3)
+        let stopChorus = app.buttons["Stop looping Chorus"].firstMatch
+        var toggled = false
+        for _ in 0..<6 where !toggled {
+            if stopChorus.exists {
+                stopChorus.tap()
+                toggled = poll(loopChorus, seconds: 6)
+            } else if loopChorus.exists {
+                loopChorus.tap()
+                toggled = poll(stopChorus, seconds: 6)
+            } else {
+                sleep(2)
+            }
+        }
+        XCTAssertTrue(toggled, "The section's Loop button didn't toggle")
+        sleep(2)
         shot("28-section-looping")
         let pause = app.buttons["Pause"].firstMatch
         if pause.exists { pause.tap() }
