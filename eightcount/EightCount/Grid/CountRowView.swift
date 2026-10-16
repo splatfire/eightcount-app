@@ -132,6 +132,7 @@ struct CountRowView: View {
             if let formation = Formation.decode(note?.formationData), !formation.dancers.isEmpty {
                 FormationMiniMap(formation: formation)
                     .frame(width: 72, height: 45)
+                    .accessibilityIdentifier("formationMini")
             }
         }
         .padding(.top, 3)

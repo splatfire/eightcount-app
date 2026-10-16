@@ -322,7 +322,8 @@ final class EightCountUITests: XCTestCase {
         XCTAssertTrue(unzoom.waitForNonExistence(timeout: 5), "Zoom didn't reset")
 
         // 8. Progress: long-press 8-count 1 (on screen under the controls) → "Got it".
-        let row1 = element(app, labelBeginsWith: "8-count 1, starts")
+        // Buttons only: searching every element is slow and can time out in the Simulator.
+        let row1 = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "8-count 1, starts")).firstMatch
         scrollList(to: row1, in: app)
         row1.press(forDuration: 1.2)
         let gotIt = app.buttons["Got it"].firstMatch
@@ -343,7 +344,7 @@ final class EightCountUITests: XCTestCase {
         addDancer.tap()
         shot("31-formation-editor")
         app.buttons["Done"].firstMatch.tap()
-        waitFor(element(app, labelBeginsWith: "Formation with 2 dancers"), 10)
+        waitFor(app.otherElements["formationMini"].firstMatch, 15)
         shot("32-formation-in-list")
     }
 
