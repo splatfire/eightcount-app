@@ -321,18 +321,36 @@ final class EightCountUITests: XCTestCase {
         XCTAssertTrue(element.isHittable, "Can't scroll to \(element)")
     }
 
-    /// Turns a Form switch on/off. SwiftUI switches react to a tap on the
-    /// switch itself, at the right edge of the row.
+    /// Turns a Form switch on/off. Taps the switch control itself (SwiftUI
+    /// rows can ignore a tap in their middle) and accepts "1"/"0" as well as
+    /// "On"/"Off" as the switch's value.
     private func setSwitch(_ app: XCUIApplication, _ labelPrefix: String, on: Bool,
                            file: StaticString = #filePath, line: UInt = #line) {
         let toggle = app.switches.matching(NSPredicate(format: "label BEGINSWITH %@", labelPrefix)).firstMatch
         scrollTo(toggle, in: app)
-        let wanted = on ? "1" : "0"
-        if (toggle.value as? String) != wanted {
-            toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+        for _ in 0..<3 where isOn(toggle) != on {
+            let inner = toggle.switches.firstMatch
+            if inner.exists && inner.isHittable {
+                inner.tap()
+            } else {
+                toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+            }
+            let changed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in self.isOn(toggle) == on },
+                                                    object: nil)
+            _ = XCTWaiter().wait(for: [changed], timeout: 2)
         }
-        let done = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", wanted), object: toggle)
-        XCTAssertEqual(XCTWaiter().wait(for: [done], timeout: 3), .completed,
-                       "Switch \(labelPrefix) didn't turn \(on ? "on" : "off")", file: file, line: line)
+        if isOn(toggle) != on { shot("fail-switch-\(labelPrefix)") }
+        XCTAssertEqual(isOn(toggle), on,
+                       "Switch \(labelPrefix) didn't turn \(on ? "on" : "off") (value: \(String(describing: toggle.value)))",
+                       file: file, line: line)
+    }
+
+    private func isOn(_ toggle: XCUIElement) -> Bool? {
+        guard toggle.exists else { return nil }
+        switch "\(toggle.value ?? "")".lowercased() {
+        case "1", "on", "true": return true
+        case "0", "off", "false": return false
+        default: return nil
+        }
     }
 }
