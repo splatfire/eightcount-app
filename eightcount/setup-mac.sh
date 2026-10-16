@@ -161,14 +161,33 @@ if [ -n "$OLD_TEAM" ]; then
   git checkout -- project.yml 2>/dev/null || true
 fi
 
+# A download can clash with a local change to an app file (Xcode sometimes
+# rewrites files when the project is opened). git then leaves "<<<<<<<"
+# markers in the file and the build breaks. Put back the downloaded version;
+# the local change stays saved in `git stash list`.
+fix_half_updated_files() {
+  local files
+  files=$(git -C .. diff --name-only --diff-filter=U 2>/dev/null || true)
+  [ -n "$files" ] || return 0
+  echo "These files were left half-updated by a download; using the downloaded version:"
+  echo "$files" | sed 's/^/  /'
+  echo "$files" | while IFS= read -r f; do
+    [ -n "$f" ] && git -C .. checkout HEAD -- "$f" 2>/dev/null || true
+  done
+  git -C .. reset -q 2>/dev/null || true
+  echo "(Any local edits to them are kept: see 'git stash list'.)"
+}
+
 OLD_HEAD=${EIGHTCOUNT_OLD_HEAD:-$(git -C .. rev-parse HEAD 2>/dev/null || echo "")}
 if [ "$UPDATE" = 1 ]; then
   step "Downloading the newest version"
+  fix_half_updated_files
   if ! git -C .. pull --autostash --ff-only; then
     # Offline or similar: the background refresh still renews the current version.
     [ "$REFRESH" = 1 ] || fail "Couldn't download the update (see the message above)."
     echo "Couldn't download updates right now — refreshing the current version."
   fi
+  fix_half_updated_files
 fi
 NEW_HEAD=$(git -C .. rev-parse HEAD 2>/dev/null || echo "")
 # The download changed this script itself: finish with the NEW version
