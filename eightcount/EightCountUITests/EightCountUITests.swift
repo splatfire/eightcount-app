@@ -332,25 +332,45 @@ final class EightCountUITests: XCTestCase {
         waitFor(element(app, labelContains: "Got it: 1 of"), 10)
         shot("30-progress")
 
-        // 9. Formation for 8-count 1: two dancers.
-        scrollList(to: row1, in: app)
+        // 9. Formation for 8-count 1: two dancers. Screenshots at each step,
+        //    and slow polling (each UI query is heavy on the CI Simulator).
+        sleep(2)
         row1.press(forDuration: 1.2)
+        sleep(2)
+        shot("30b-menu")
         let formationItem = app.buttons["Formation…"].firstMatch
-        waitFor(formationItem, 5)
+        XCTAssertTrue(poll(formationItem, seconds: 20), "No Formation… menu item")
         formationItem.tap()
+        sleep(3)
+        shot("30c-formation-opened")
         let addDancer = app.buttons["Add dancer"].firstMatch
-        waitFor(addDancer, 10)
+        XCTAssertTrue(poll(addDancer, seconds: 30), "Formation editor didn't open")
         addDancer.tap()
+        sleep(1)
         addDancer.tap()
+        sleep(1)
         shot("31-formation-editor")
         app.buttons["Done"].firstMatch.tap()
+        sleep(3)
+        shot("32-formation-on-video")
         // The mini map on the video (the list's copy is inside the row's button).
         let onVideo = app.otherElements["videoFormation"].firstMatch
         let asImage = app.images["videoFormation"].firstMatch
-        let shown = NSPredicate { _, _ in onVideo.exists || asImage.exists }
-        XCTAssertEqual(XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: shown, object: nil)], timeout: 15),
-                       .completed, "Formation mini map not shown on the video")
-        shot("32-formation-in-list")
+        var found = false
+        for _ in 0..<4 where !found {
+            found = onVideo.exists || asImage.exists
+            if !found { sleep(3) }
+        }
+        XCTAssertTrue(found, "Formation mini map not shown on the video")
+    }
+
+    /// Checks every 2 s (instead of continuously) whether `element` exists.
+    private func poll(_ element: XCUIElement, seconds: Int) -> Bool {
+        for _ in 0..<max(seconds / 2, 1) {
+            if element.exists { return true }
+            sleep(2)
+        }
+        return element.exists
     }
 
     /// Scrolls the 8-count list until `element` is on screen.
