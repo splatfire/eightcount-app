@@ -297,7 +297,11 @@ final class EightCountUITests: XCTestCase {
         shot("27-speed-ladder")
         app.buttons["Stop the coach"].firstMatch.tap()
 
-        // 6. Loop the section from its header in the list.
+        // 6. Loop the section from its header in the list. (The ladder above
+        //    looped 8-counts 1–4, which IS the Chorus, so its header may
+        //    already say "Looping": switch that off first.)
+        let stopChorus = app.buttons["Stop looping Chorus"].firstMatch
+        if stopChorus.waitForExistence(timeout: 3) { stopChorus.tap() }
         let loopChorus = app.buttons["Loop Chorus"].firstMatch
         waitFor(loopChorus, 10)
         loopChorus.tap()
