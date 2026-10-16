@@ -45,6 +45,16 @@ final class PlayerController {
     /// Which 8-count (0-based) is being looped, if the loop came from
     /// `loopEightCount(...)`. Cleared when A/B are changed by hand.
     private(set) var loopedEightCount: Int? = nil
+    /// Counts how often the loop jumped from B back to A (one finished run).
+    /// The practice coach watches it to move on after enough runs.
+    private(set) var loopWraps = 0
+
+    /// True during the "5, 6, 7, 8" before the video starts.
+    private(set) var isCountingIn = false
+    /// Plays the count-in sounds (set by the practice screen when the
+    /// count-in is switched on). Nil = no count-in.
+    @ObservationIgnored weak var countIn: CountInProvider?
+    @ObservationIgnored private var countInTask: Task<Void, Never>?
 
     /// A readable error if the video could not be opened.
     private(set) var loadError: String? = nil
@@ -165,6 +175,7 @@ final class PlayerController {
     /// Call from `.onDisappear`. (Observers come back automatically on the
     /// next load, play or seek, so it is safe if the view reappears.)
     func tearDown() {
+        cancelCountIn()
         if let token = timeObserver {
             player.removeTimeObserver(token)
         }
@@ -179,9 +190,13 @@ final class PlayerController {
 
     // MARK: - Play / pause
 
-    func play() {
+    /// Starts playing. With a count-in set up (`countIn`), "5, 6, 7, 8" is
+    /// heard first and the video starts right after it. `countIn: false`
+    /// skips it (e.g. when you let go of the scrubber).
+    func play(countIn: Bool = true) {
         guard isReady, player.currentItem != nil else { return }
         installObserversIfNeeded()
+        cancelCountIn()
 
         if isLooping, let start = loopStart, let end = loopEnd, currentTime >= end - 0.001 {
             // Paused at (or past) B: start the loop again from A.
@@ -191,16 +206,42 @@ final class PlayerController {
             seekPrecisely(to: 0)
         }
 
+        let wait = countIn ? (self.countIn?.startCountIn(rate: rate) ?? 0) : 0
+        guard wait > 0 else {
+            startPlayer()
+            return
+        }
+        isCountingIn = true
+        countInTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(wait))
+            guard let self, !Task.isCancelled else { return }
+            self.isCountingIn = false
+            self.countInTask = nil
+            self.startPlayer()
+        }
+    }
+
+    private func startPlayer() {
         player.defaultRate = rate
         player.play()
     }
 
     func pause() {
+        cancelCountIn()
         player.pause()
     }
 
+    /// Stops a running count-in (and its sounds).
+    private func cancelCountIn() {
+        guard isCountingIn || countInTask != nil else { return }
+        countInTask?.cancel()
+        countInTask = nil
+        isCountingIn = false
+        countIn?.cancelCountIn()
+    }
+
     func togglePlayPause() {
-        if isPlaying {
+        if isPlaying || isCountingIn {
             pause()
         } else {
             play()
@@ -278,6 +319,18 @@ final class PlayerController {
         loopEnd = b
         isLoopEnabled = true
         loopedEightCount = index
+        seekPrecisely(to: a)
+    }
+
+    /// Loops a stretch of several 8-counts (or any range): sets A/B and
+    /// jumps to A. `loopedEightCount` stays nil.
+    func loopSpan(start: Double, end: Double) {
+        let a = clamped(min(start, end))
+        let b = clamped(max(start, end))
+        loopStart = a
+        loopEnd = b
+        isLoopEnabled = true
+        loopedEightCount = nil
         seekPrecisely(to: a)
     }
 
@@ -403,6 +456,7 @@ final class PlayerController {
         // A-B loop: passed B while playing → jump back to A, keep playing.
         if isLooping, player.timeControlStatus != .paused,
            let start = loopStart, let end = loopEnd, seconds >= end {
+            loopWraps += 1
             seekPrecisely(to: start)
         }
     }
@@ -410,6 +464,7 @@ final class PlayerController {
     private func handleDidPlayToEnd() {
         if isLooping, let start = loopStart {
             // B was at (or very near) the end of the video.
+            loopWraps += 1
             seekPrecisely(to: start)
             player.play()
         } else {
@@ -427,4 +482,14 @@ final class PlayerController {
         isPlaying = playing
         UIApplication.shared.isIdleTimerDisabled = playing
     }
+}
+
+/// Something that can play a count-in before the video starts.
+@MainActor
+protocol CountInProvider: AnyObject {
+    /// Starts the count-in sounds and returns how many seconds they take
+    /// (0 = no count-in right now). `rate` is the playback speed.
+    func startCountIn(rate: Float) -> TimeInterval
+    /// Silences a count-in that is still running.
+    func cancelCountIn()
 }

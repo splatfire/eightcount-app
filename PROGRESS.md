@@ -101,6 +101,13 @@ User asked for (subagents must use model "sonnet" to save tokens):
   Bundle ID now comes from EC_APP_BUNDLE_ID (watch = +.watchkitapp); setup-mac.sh passes EC_APP_BUNDLE_ID
   and downloads the watchOS platform if missing. Not tried on a real watch (free-account signing!).
 
+- Practice tools from the dancer research (user: "do as you just suggested"): Practice/PracticeCoach.swift
+  (build-up + speed ladder, advance on PlayerController.loopWraps), Practice/CountCues.swift (count-in via
+  PlayerController.countIn hook, beat click / spoken counts scheduled on the audio clock with
+  AVAudioPlayerNode, spoken move names via AVSpeechSynthesizer, fade per loop run), memory-test cover,
+  next-move hint, pinch zoom (VideoZoom), PracticeSection model (+ export/import, list headers, loop).
+  Only compile-checked in CI; audio timing needs a test on the iPhone.
+
 ## Next step
 - User tests on device: camera recording, real analysis, Apple Intelligence tips; report any issues.
 - Free Apple ID: re-run `./setup-mac.sh --install --no-open` every 7 days.

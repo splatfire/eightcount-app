@@ -31,6 +31,15 @@ enum ProjectArchive {
         /// which video to add.
         var originalVideoName: String?
         var notes: [ExportNote]
+        /// Named sections. Optional: older files don't have them.
+        var sections: [ExportSection]? = nil
+    }
+
+    /// One named section ("Chorus" = 8-counts 9–16, 0-based in the file).
+    struct ExportSection: Codable {
+        var name: String
+        var startIndex: Int
+        var endIndex: Int
     }
 
     /// Notes for one 8-count.
@@ -120,7 +129,10 @@ enum ProjectArchive {
             bpm: finiteOrZero(project.bpm),
             offset: finiteOrZero(project.offset),
             originalVideoName: project.originalVideoName,
-            notes: notes
+            notes: notes,
+            sections: project.sortedSections.map {
+                ExportSection(name: $0.name, startIndex: $0.startIndex, endIndex: $0.endIndex)
+            }
         )
 
         let encoder = JSONEncoder()
@@ -265,6 +277,14 @@ enum ProjectArchive {
                 context.insert(snap)
                 snap.note = note
             }
+        }
+
+        for exportSection in file.sections ?? [] where exportSection.startIndex >= 0 && exportSection.endIndex >= 0 {
+            let section = PracticeSection(name: exportSection.name,
+                                          startIndex: exportSection.startIndex,
+                                          endIndex: exportSection.endIndex)
+            context.insert(section)
+            section.project = project
         }
 
         do {

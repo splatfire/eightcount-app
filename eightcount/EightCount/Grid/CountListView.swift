@@ -9,29 +9,43 @@ struct CountListView: View {
     let grid: CountGrid
     /// The 8-count playing right now (nil before count 1).
     let currentIndex: Int?
-    /// The 8-count being looped, if any.
-    let loopedIndex: Int?
+    /// The 8-counts being looped (one, or a whole stretch), if any.
+    let loopedRange: ClosedRange<Int>?
+    /// Named sections, shown as headers above their first 8-count.
+    let sections: [PracticeSection]
+    /// The section whose 8-counts are looping right now.
+    let loopedSectionID: UUID?
     /// When true, the list scrolls by itself to keep the current 8-count visible.
     let followPlayback: Bool
     let onJump: (Int) -> Void
     let onToggleLoop: (Int) -> Void
     let onEdit: (Int) -> Void
     let onSetupTempo: () -> Void
+    let onLoopSection: (PracticeSection) -> Void
+    /// Long-press menu: "New section from here".
+    let onNewSection: (Int) -> Void
 
-    init(project: Project, grid: CountGrid, currentIndex: Int?, loopedIndex: Int?, followPlayback: Bool,
+    init(project: Project, grid: CountGrid, currentIndex: Int?, loopedRange: ClosedRange<Int>?,
+         sections: [PracticeSection], loopedSectionID: UUID?, followPlayback: Bool,
          onJump: @escaping (Int) -> Void,
          onToggleLoop: @escaping (Int) -> Void,
          onEdit: @escaping (Int) -> Void,
-         onSetupTempo: @escaping () -> Void) {
+         onSetupTempo: @escaping () -> Void,
+         onLoopSection: @escaping (PracticeSection) -> Void,
+         onNewSection: @escaping (Int) -> Void) {
         self.project = project
         self.grid = grid
         self.currentIndex = currentIndex
-        self.loopedIndex = loopedIndex
+        self.loopedRange = loopedRange
+        self.sections = sections
+        self.loopedSectionID = loopedSectionID
         self.followPlayback = followPlayback
         self.onJump = onJump
         self.onToggleLoop = onToggleLoop
         self.onEdit = onEdit
         self.onSetupTempo = onSetupTempo
+        self.onLoopSection = onLoopSection
+        self.onNewSection = onNewSection
     }
 
     var body: some View {
@@ -111,16 +125,26 @@ struct CountListView: View {
     private func rows(_ notesByIndex: [Int: CountNote]) -> some View {
         if grid.isValid && grid.numberOfEightCounts > 0 {
             ForEach(0..<grid.numberOfEightCounts, id: \.self) { index in
+                ForEach(sections.filter { $0.startIndex == index }, id: \.id) { section in
+                    sectionHeader(section)
+                }
                 CountRowView(
                     index: index,
                     startTime: grid.start(of: index),
                     note: notesByIndex[index],
                     isCurrent: currentIndex == index,
-                    isLooped: loopedIndex == index,
+                    isLooped: loopedRange?.contains(index) ?? false,
                     onJump: { onJump(index) },
                     onToggleLoop: { onToggleLoop(index) },
                     onEdit: { onEdit(index) }
                 )
+                .contextMenu {
+                    Button {
+                        onNewSection(index)
+                    } label: {
+                        Label("New Section from Here…", systemImage: "rectangle.stack.badge.plus")
+                    }
+                }
                 .id(index)
             }
         } else if grid.bpm > 0 && grid.duration <= 0 {
@@ -143,6 +167,38 @@ struct CountListView: View {
                 buttonTitle: "Set Tempo"
             )
         }
+    }
+
+    /// "CHORUS · 8-counts 9–16  ⟳" above a section's first 8-count.
+    private func sectionHeader(_ section: PracticeSection) -> some View {
+        let isLooping = loopedSectionID == section.id
+        return HStack(spacing: 8) {
+            Text(section.name.uppercased())
+                .font(.system(.caption, design: .rounded).weight(.bold))
+                .tracking(0.8)
+                .foregroundStyle(Theme.accent)
+                .lineLimit(1)
+            Text(section.rangeText)
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(Theme.secondaryText)
+                .lineLimit(1)
+            Rectangle()
+                .fill(Theme.hairline)
+                .frame(height: 1)
+            Button {
+                onLoopSection(section)
+            } label: {
+                Label(isLooping ? "Looping" : "Loop", systemImage: "repeat")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isLooping ? Color.black : Theme.loopColor)
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 30)
+                    .background(Capsule().fill(isLooping ? Theme.loopColor : Theme.loopColor.opacity(0.15)))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isLooping ? "Stop looping \(section.name)" : "Loop \(section.name)")
+        }
+        .padding(.top, 6)
     }
 
     /// Calm, centered empty state: soft icon circle, short text, one button.

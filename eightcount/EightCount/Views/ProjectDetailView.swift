@@ -42,6 +42,22 @@ struct ProjectDetailView: View {
     /// gets smaller. Remembered between launches.
     @AppStorage("bigVideo") private var bigVideo = false
 
+    // Practice tools (see Practice/).
+    @State private var coach = PracticeCoach()
+    @State private var cues = CountCues()
+    @State private var zoom = VideoZoom()
+    @State private var showTools = false
+    @State private var newSection: SectionDraft?
+    /// Memory test: the video is covered (not remembered: it's a test, not a setting).
+    @State private var memoryTest = false
+    @State private var peeking = false
+    @AppStorage("showNextMove") private var showNextMove = true
+    @AppStorage("cueCountIn") private var cueCountIn = false
+    @AppStorage("cueClick") private var cueClick = false
+    @AppStorage("cueSayCounts") private var cueSayCounts = false
+    @AppStorage("cueSayMoves") private var cueSayMoves = false
+    @AppStorage("cueFade") private var cueFade = false
+
     /// The 8-count layout for the current BPM / offset / video length.
     private var grid: CountGrid {
         CountGrid(bpm: project.bpm, offset: project.offset, duration: controller.duration)
@@ -73,10 +89,48 @@ struct ProjectDetailView: View {
         }
         .onAppear {
             WatchRemoteHandlers.attachPractice(id: watchID, project: project, controller: controller)
+            cues.start(controller: controller)
+            updateCues()
         }
         .onDisappear {
             WatchRemote.shared.detach(id: watchID)
+            cues.stop()
             controller.tearDown()
+        }
+        .onChange(of: cueSettings) { _, _ in updateCues() }
+        .onChange(of: grid) { _, _ in updateCues() }
+        // The coach moves on after enough runs of the loop…
+        .onChange(of: controller.loopWraps) { _, _ in
+            coach.loopWrapped(controller: controller, grid: grid)
+        }
+        // …and stops when you switch the loop off or jump out of it.
+        .onChange(of: controller.isLooping) { _, looping in
+            if !looping { coach.stop() }
+        }
+        .sheet(isPresented: $showTools) {
+            PracticeToolsSheet(
+                project: project,
+                grid: grid,
+                currentIndex: currentIndex,
+                memoryTest: $memoryTest,
+                showNextMove: $showNextMove,
+                cues: cueSettingsBinding,
+                onBuildUp: { first, last, runs, name in
+                    coach.startBuildUp(first: first, last: last, runs: runs, rate: controller.rate,
+                                       name: name, controller: controller, grid: grid)
+                },
+                onSpeedLadder: { first, last, runs, name in
+                    coach.startSpeedLadder(first: first, last: last, runs: runs, name: name,
+                                           controller: controller, grid: grid)
+                },
+                onLoopSection: { loopSection($0) }
+            )
+            .presentationDetents([.medium, .large])
+        }
+        .sheet(item: $newSection) { draft in
+            SectionEditorSheet(draft: draft, count: grid.numberOfEightCounts) { saved in
+                saved.save(to: project, context: modelContext)
+            }
         }
         .sheet(item: $editing) { target in
             NoteEditorSheet(project: project, countIndex: target.id, grid: grid)
@@ -136,16 +190,36 @@ struct ProjectDetailView: View {
                 let videoWidth = max(geo.size.width - 32, 0)
                 let videoHeight = min(videoWidth / aspect, geo.size.height * (bigVideo ? 0.62 : 0.34))
 
-                VideoSurface(controller: controller)
+                let videoSize = CGSize(width: videoWidth, height: videoHeight)
+
+                VideoSurface(controller: controller, zoom: zoom.scale, pan: zoom.offset)
                     .frame(width: videoWidth, height: videoHeight)
                     .overlay {
                         // Short white flash = "snapshot taken".
                         Color.white.opacity(flash ? 0.6 : 0)
                             .allowsHitTesting(false)
                     }
+                    .overlay {
+                        if memoryTest {
+                            MemoryTestCover(controller: controller, grid: grid, isPeeking: $peeking)
+                                .transition(.opacity)
+                        }
+                    }
                     .clipShape(RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous))
                     // Double-tap the video, or tap the corner button, to make it bigger/smaller.
                     .onTapGesture(count: 2) { toggleBigVideo() }
+                    // Pinch to zoom in on the feet / hands; drag to look around.
+                    .gesture(
+                        MagnifyGesture()
+                            .onChanged { zoom.pinch($0.magnification, in: videoSize) }
+                            .onEnded { _ in withAnimation(.snappy) { zoom.settle(in: videoSize) } }
+                    )
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 6)
+                            .onChanged { zoom.drag($0.translation, in: videoSize) }
+                            .onEnded { _ in zoom.settle(in: videoSize) },
+                        including: zoom.isZoomed ? .all : .subviews
+                    )
                     .overlay(alignment: .bottomTrailing) {
                         Button { toggleBigVideo() } label: {
                             Image(systemName: bigVideo ? "arrow.down.right.and.arrow.up.left"
@@ -159,6 +233,47 @@ struct ProjectDetailView: View {
                         .padding(8)
                         .accessibilityLabel(bigVideo ? "Smaller video" : "Bigger video")
                     }
+                    .overlay(alignment: .topLeading) {
+                        Button { showTools = true } label: {
+                            Image(systemName: "figure.dance")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(coach.isActive || memoryTest ? Theme.accent : Color.white)
+                                .frame(width: 36, height: 36)
+                                .glassSurface(Circle(), fallback: Color.black.opacity(0.55))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(8)
+                        .accessibilityLabel("Practice tools")
+                    }
+                    .overlay(alignment: .top) {
+                        if zoom.isZoomed {
+                            Button {
+                                withAnimation(.snappy) { zoom.reset() }
+                            } label: {
+                                Label(String(format: "%.1f×", zoom.scale), systemImage: "xmark")
+                                    .font(.caption.weight(.semibold).monospacedDigit())
+                                    .foregroundStyle(Color.white)
+                                    .padding(.horizontal, 10)
+                                    .frame(height: 30)
+                                    .glassSurface(Capsule(), fallback: Color.black.opacity(0.55))
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.top, 11)
+                            .accessibilityLabel("Zoomed in. Show the whole video")
+                        }
+                    }
+                    .overlay(alignment: .bottomLeading) {
+                        if let hint = nextMove {
+                            NextMoveHint(index: hint.index, text: hint.text)
+                                .padding(.leading, 8)
+                                .padding(.trailing, 52)
+                                .padding(.bottom, 8)
+                                .transition(.opacity)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .animation(.snappy, value: nextMove?.index)
+                    .animation(.easeInOut(duration: 0.2), value: memoryTest)
                     .padding(.top, 6)
                     .background(
                         PlayheadTracker(
@@ -168,6 +283,19 @@ struct ProjectDetailView: View {
                             countLabel: $countLabel
                         )
                     )
+
+                if coach.isActive || fadingCueLevel != nil {
+                    CoachBar(
+                        coach: coach,
+                        cueLevel: fadingCueLevel,
+                        onNext: { coach.next(controller: controller, grid: grid) },
+                        onRestart: { coach.restart(controller: controller, grid: grid) },
+                        onStop: { coach.stop() }
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
 
                 PlaybackControlsView(
                     controller: controller,
@@ -182,15 +310,97 @@ struct ProjectDetailView: View {
                     project: project,
                     grid: grid,
                     currentIndex: currentIndex,
-                    loopedIndex: controller.isLooping ? controller.loopedEightCount : nil,
+                    loopedRange: loopedRange,
+                    sections: project.sortedSections,
+                    loopedSectionID: loopedSectionID,
                     followPlayback: followPlayback && controller.isPlaying,
                     onJump: { jump(to: $0) },
                     onToggleLoop: { toggleLoop($0) },
                     onEdit: { editing = EditTarget(id: $0) },
-                    onSetupTempo: { showTempo = true }
+                    onSetupTempo: { showTempo = true },
+                    onLoopSection: { loopSection($0) },
+                    onNewSection: { index in
+                        newSection = SectionDraft(start: index,
+                                                  end: min(index + 3, max(grid.numberOfEightCounts - 1, 0)))
+                    }
                 )
             }
+            .animation(.snappy, value: coach.isActive)
         }
+    }
+
+    // MARK: - Practice tools
+
+    /// The next 8-count's note, for the hint on the video. Hidden in the
+    /// memory test (unless you're peeking) – that would be cheating.
+    private var nextMove: (index: Int, text: String)? {
+        guard showNextMove, grid.isValid, !memoryTest || peeking else { return nil }
+        let next = (currentIndex ?? -1) + 1
+        guard next < grid.numberOfEightCounts,
+              let text = NextMoveHint.text(of: project.note(for: next)) else { return nil }
+        return (next, text)
+    }
+
+    /// The 8-counts the loop covers, when it lines up with whole 8-counts.
+    private var loopedRange: ClosedRange<Int>? {
+        guard controller.isLooping else { return nil }
+        if let index = controller.loopedEightCount { return index...index }
+        guard grid.isValid, let a = controller.loopStart, let b = controller.loopEnd,
+              let first = grid.index(at: a), let last = grid.index(at: max(b - 0.01, a)),
+              abs(max(grid.start(of: first), 0) - a) < 0.02,
+              abs(grid.end(of: last) - b) < 0.02 else { return nil }
+        return first...last
+    }
+
+    private var loopedSectionID: UUID? {
+        guard let range = loopedRange else { return nil }
+        return project.sections.first { section in
+            let last = min(section.endIndex, grid.numberOfEightCounts - 1)
+            return section.startIndex == range.lowerBound && last == range.upperBound
+        }?.id
+    }
+
+    /// The cue volume while "Fade as I repeat" is turning it down.
+    private var fadingCueLevel: Float? {
+        guard cueFade, cueSettings.duringPlayback, controller.isLooping, cues.level < 0.999 else { return nil }
+        return cues.level
+    }
+
+    private var cueSettings: CountCues.Settings {
+        CountCues.Settings(countIn: cueCountIn, click: cueClick, sayCounts: cueSayCounts,
+                           sayMoves: cueSayMoves, fade: cueFade)
+    }
+
+    private var cueSettingsBinding: Binding<CountCues.Settings> {
+        Binding(
+            get: { cueSettings },
+            set: { new in
+                cueCountIn = new.countIn
+                cueClick = new.click
+                cueSayCounts = new.sayCounts
+                cueSayMoves = new.sayMoves
+                cueFade = new.fade
+            }
+        )
+    }
+
+    private func updateCues() {
+        cues.update(settings: cueSettings, grid: grid) { [project] index in
+            NextMoveHint.text(of: project.note(for: index))
+        }
+    }
+
+    /// Loops a whole section (or stops it if it's already looping).
+    private func loopSection(_ section: PracticeSection) {
+        guard grid.isValid, section.startIndex < grid.numberOfEightCounts else { return }
+        coach.stop()
+        if loopedSectionID == section.id {
+            controller.clearLoop()
+            return
+        }
+        let last = min(section.endIndex, grid.numberOfEightCounts - 1)
+        controller.loopSpan(start: max(grid.start(of: section.startIndex), 0), end: grid.end(of: last))
+        if !controller.isPlaying { controller.play() }
     }
 
     /// Shown when the project has no video yet (e.g. right after importing
@@ -372,6 +582,7 @@ struct ProjectDetailView: View {
     /// Loop just this 8-count, or stop looping it if it already loops.
     private func toggleLoop(_ index: Int) {
         guard grid.isValid else { return }
+        coach.stop()
         if controller.isLooping && controller.loopedEightCount == index {
             controller.clearLoop()
         } else {

@@ -30,6 +30,10 @@ final class Project {
     @Relationship(deleteRule: .cascade, inverse: \Take.project)
     var takes: [Take] = []
 
+    /// Named parts of the dance ("Chorus" = 8-counts 9–16).
+    @Relationship(deleteRule: .cascade, inverse: \PracticeSection.project)
+    var sections: [PracticeSection] = []
+
     init(title: String, section: String = "", bpm: Double = 0, offset: Double = 0) {
         self.id = UUID()
         self.title = title
@@ -49,6 +53,11 @@ final class Project {
     /// "Title · section" for headers.
     var displayTitle: String {
         section.isEmpty ? title : "\(title) · \(section)"
+    }
+
+    /// Sections in the order they happen in the dance.
+    var sortedSections: [PracticeSection] {
+        sections.sorted { ($0.startIndex, $0.createdAt) < ($1.startIndex, $1.createdAt) }
     }
 
     /// The note for 8-count `index`, if one has been written.

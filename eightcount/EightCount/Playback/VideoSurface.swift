@@ -10,9 +10,14 @@ import UIKit
 @MainActor
 struct VideoSurface: View {
     let controller: PlayerController
+    /// Pinch zoom (1 = whole video) and where the zoomed picture is moved to.
+    var zoom: CGFloat = 1
+    var pan: CGSize = .zero
 
-    init(controller: PlayerController) {
+    init(controller: PlayerController, zoom: CGFloat = 1, pan: CGSize = .zero) {
         self.controller = controller
+        self.zoom = zoom
+        self.pan = pan
     }
 
     var body: some View {
@@ -22,6 +27,9 @@ struct VideoSurface: View {
             PlayerLayerView(player: controller.player)
                 // Only the video is flipped; the badge below is not.
                 .scaleEffect(x: controller.isMirrored ? -1 : 1, y: 1)
+                // Zoom after the flip, so dragging moves the way your finger goes.
+                .scaleEffect(zoom)
+                .offset(pan)
                 .opacity(controller.isReady ? 1 : 0)
 
             if let error = controller.loadError {

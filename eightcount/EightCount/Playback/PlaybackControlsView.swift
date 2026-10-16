@@ -79,7 +79,7 @@ struct PlaybackControlsView: View {
                 controller.seek(to: time)
                 isScrubbing = false
                 if wasPlayingBeforeScrub {
-                    controller.play()
+                    controller.play(countIn: false)
                 }
             },
             onNudge: { seconds in
@@ -140,7 +140,7 @@ struct PlaybackControlsView: View {
             Button {
                 controller.togglePlayPause()
             } label: {
-                Image(systemName: controller.isPlaying ? "pause.fill" : "play.fill")
+                Image(systemName: controller.isPlaying || controller.isCountingIn ? "pause.fill" : "play.fill")
                     .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(.round(size: 68, prominent: true))

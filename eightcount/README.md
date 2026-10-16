@@ -28,6 +28,14 @@ tutorial and dance-practice videos:
   Intelligence then writes tips on what to work on.
 - **Liquid Glass** design on iOS 26 and newer (including iOS 27), with a
   normal look on older iOS.
+- **Practice tools** (✦ button on the video): a **coach** that builds a part
+  up 8-count by 8-count ("1, then 1–2, then 1–3 …") or runs it at ½× → ¾× →
+  full speed, moving on by itself after a few runs; a **memory test** that
+  covers the video (hold to peek); the **next move** from your notes in the
+  corner of the video; spoken **cues** (count-in "5, 6, 7, 8", beat click,
+  the counts, your own move names) that can **fade out** as you repeat; and
+  named **sections** ("Chorus" = 8-counts 9–16) you loop with one tap.
+  **Pinch the video** to zoom in on feet or hands.
 - **Apple Watch remote** (watchOS 10+): play/pause, back/next 8-count,
   speed (also with the Digital Crown) and loop from your wrist, plus which
   8-count is playing. See 1.8.
@@ -375,6 +383,32 @@ How a practice session works in the code:
    - **Original recording**: the untouched file, without sound.
    It's saved to Photos in Full HD (1080p, TikTok's maximum).
 
+### Practice tools (how to use them)
+
+Tap **✦** in the top-left corner of the video. Set the tempo first: the
+tools need to know where each 8-count is.
+
+- **Coach → Build up**: pick a part ("From 8-count 5", 4 8-counts, or one of
+  your sections) and how often each step runs. It loops 8-count 5, then 5–6,
+  then 5–7, then 5–8, and moves on by itself. The bar under the video shows
+  the step and run; ⏭ skips a step, ✕ stops. At the end the whole part keeps
+  looping so you can run it full out.
+- **Coach → Speed ladder**: the same part at ½×, then ¾×, then full speed.
+- **Memory test**: the video goes black, the music and the big count keep
+  going. Touch and hold the video to peek.
+- **Show the next move**: the first line of the next 8-count's note appears
+  in the corner of the video ("NEXT 6  turn left, hit").
+- **Cues**: *Count-in* says "5, 6, 7, 8" in the song's tempo before the video
+  starts. *Beat click* ticks on every beat. *Say the counts* says 1…8.
+  *Say my moves* reads the next 8-count's note on count 5. *Fade as I
+  repeat* makes the cues quieter every time a loop starts over, until
+  you dance without them.
+- **Sections**: "New Section", or long-press an 8-count in the list → **New
+  Section from Here…**. A section header appears in the list with a
+  **Loop** button. Sections are included when you export a project.
+- **Zoom**: pinch the video, drag to look around, tap the "2.0× ✕" chip to
+  see everything again.
+
 How the AI analysis works: Apple's Vision framework finds 15 body points
 (shoulders, elbows, wrists, hips, knees, ankles…) in about 10 frames per
 second of both videos. The app compares joint angles, arm height, posture,
@@ -387,6 +421,15 @@ facial expression or energy.
 ---
 
 ## 5. Check on Mac (what I'm not 100 % sure about)
+
+**Practice tools (new, only compile-checked):**
+- The spoken numbers are made with the iPhone's own voice when the screen
+  opens (about a second). Until then, and if that fails, you hear ticks.
+- Whether the clicks and counts sound exactly on the beat on your iPhone
+  (they are scheduled on the audio clock; Bluetooth headphones add their own
+  delay, and that can't be fixed in the app).
+- The count-in starts the video right after "8". The video itself can take a
+  moment to start, so count 1 may be a little late.
 
 **Apple Watch remote (new, not tried on a real watch yet):**
 - Whether a **free Apple ID** signs and installs the watch app without
@@ -689,8 +732,9 @@ Change any of them later.
 
 ## 7. Next steps (not built yet)
 
-- **Count-in before a loop restarts:** a spoken or visual "5, 6, 7, 8" right
-  before the A-B / 8-count loop jumps back, so you're ready on count 1.
+- **Count-in before a loop restarts:** right now the count-in plays when you
+  press Play, not each time the loop starts over.
+- **Hide the tutorial while recording** (a memory test you can film).
 - **Practice tracking:** a "practiced / not yet" checkmark per 8-count and a
   progress bar per project.
 

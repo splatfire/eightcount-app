@@ -23,6 +23,6 @@ struct EightCountApp: App {
                 .tint(Theme.accent)
         }
         // Creates (or opens) the on-device database for all model types.
-        .modelContainer(for: [Project.self, CountNote.self, PoseSnapshot.self, Take.self])
+        .modelContainer(for: [Project.self, CountNote.self, PoseSnapshot.self, Take.self, PracticeSection.self])
     }
 }
