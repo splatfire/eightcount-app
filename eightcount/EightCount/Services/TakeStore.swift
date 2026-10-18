@@ -14,10 +14,11 @@ enum TakeStore {
     @MainActor
     @discardableResult
     static func addTake(fileName: String, tutorialStart: Double, tutorialEnd: Double,
-                        takeOffset: Double, recordRate: Double,
+                        takeOffset: Double, recordRate: Double, backCamera: Bool = false,
                         to project: Project, context: ModelContext) -> Take {
         let take = Take(fileName: fileName, tutorialStart: tutorialStart, tutorialEnd: tutorialEnd,
                         takeOffset: takeOffset, recordRate: recordRate)
+        take.backCamera = backCamera
         context.insert(take)
         take.project = project
         project.updatedAt = .now

@@ -21,9 +21,11 @@ struct ExportTakeSheet: View {
     @State private var mirrorTutorial: Bool
 
     /// Read the take's values now (on the main actor) and keep plain copies.
-    init(take: Take, project: Project, mirrorMe: Bool = true, mirrorTutorial: Bool = false) {
+    /// Pass nil for `mirrorMe` to mirror a front-camera take and leave a
+    /// back-camera take unmirrored.
+    init(take: Take, project: Project, mirrorMe: Bool? = nil, mirrorTutorial: Bool = false) {
         self.init(snapshot: TakeSnapshot(take: take, tutorialURL: project.videoURL),
-                  mirrorMe: mirrorMe, mirrorTutorial: mirrorTutorial)
+                  mirrorMe: mirrorMe ?? !take.backCamera, mirrorTutorial: mirrorTutorial)
     }
 
     init(snapshot: TakeSnapshot, mirrorMe: Bool = true, mirrorTutorial: Bool = false) {

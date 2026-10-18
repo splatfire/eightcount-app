@@ -5,7 +5,7 @@ import CoreMedia
 import UIKit
 
 /// The recording screen: the tutorial plays (with its music) while the front
-/// camera films you dancing. Afterwards you can jump to the compare screen.
+/// or back camera films you dancing. Afterwards you can jump to the compare screen.
 ///
 /// Present it with `.fullScreenCover`. It has its own Close (X) button.
 @MainActor
@@ -340,7 +340,8 @@ struct RecordView: View {
         .padding(.vertical, 8)
     }
 
-    /// [Close] ......... "● REC 0:07" ......... [Layout]
+    /// [Close] ......... "● REC 0:07" ......... [Flip] [Sound] [Eye] [Layout]
+    /// Flip is shown only when the device has both cameras.
     private var topBar: some View {
         GlassGroup(spacing: 10) {
             ZStack {
@@ -354,6 +355,19 @@ struct RecordView: View {
                     .accessibilityLabel("Close")
 
                     Spacer(minLength: 0)
+
+                    if model.recorder.canSwitchCamera {
+                        Button {
+                            Task { await model.recorder.switchCamera() }
+                        } label: {
+                            Image(systemName: "arrow.triangle.2.circlepath.camera")
+                        }
+                        .buttonStyle(.round(size: 40))
+                        .disabled(model.isLayoutLocked || model.recorder.isRecording)
+                        .opacity((model.isLayoutLocked || model.recorder.isRecording) ? 0.4 : 1)
+                        .accessibilityLabel("Switch camera")
+                        .accessibilityValue(model.recorder.position == .back ? "Back camera" : "Front camera")
+                    }
 
                     Button {
                         countdownSound.toggle()
@@ -544,7 +558,7 @@ struct RecordView: View {
             Text("Camera access is off")
                 .font(.system(.title2, design: .rounded).weight(.bold))
                 .foregroundStyle(Color.white)
-            Text("EightCount needs the front camera to film you dancing, so you can compare yourself with the tutorial. Nothing is uploaded and no microphone is used. You can switch the camera on in Settings.")
+            Text("EightCount needs the camera to film you dancing, so you can compare yourself with the tutorial. Nothing is uploaded and no microphone is used. You can switch the camera on in Settings.")
                 .font(.subheadline)
                 .foregroundStyle(Theme.secondaryText)
                 .multilineTextAlignment(.center)
@@ -728,6 +742,9 @@ private final class RecordSessionModel {
     @ObservationIgnored private var tutorialEndSeconds: Double = 0
     /// Delete the file instead of saving it (stopped too early / closed).
     @ObservationIgnored private var discardOnFinish = false
+    /// Camera used for the recording in progress. Captured when recording
+    /// starts, so a later flip does not change this take.
+    @ObservationIgnored private var recordingWithBackCamera = false
 
     // MARK: Derived state for the buttons
 
@@ -735,7 +752,7 @@ private final class RecordSessionModel {
         phase == .starting || phase == .countdown || phase == .recording
     }
     var canStart: Bool {
-        phase == .idle && recorder.isRunning && tutorial.isReady
+        phase == .idle && recorder.isRunning && tutorial.isReady && !recorder.isSwitching
     }
     var canStop: Bool {
         phase == .countdown || phase == .recording
@@ -821,6 +838,7 @@ private final class RecordSessionModel {
         savedTake = nil
         recordingStartSeconds = CMClockGetTime(CMClockGetHostTimeClock()).seconds
         phase = .starting
+        recordingWithBackCamera = recorder.position == .back
 
         recorder.startRecording(
             to: url,
@@ -949,6 +967,7 @@ private final class RecordSessionModel {
                 tutorialEnd: max(tutorialEndSeconds, startTime),
                 takeOffset: Self.countdownSeconds,
                 recordRate: rate,
+                backCamera: recordingWithBackCamera,
                 to: project,
                 context: context
             )

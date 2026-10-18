@@ -16,7 +16,7 @@ tutorial and dance-practice videos:
 - **Projects**: one per song or section. Create, rename, delete (always confirmed).
 - **Export / import** a project's notes and snapshots (not the video) as one
   file, so you can back them up or send them to someone in your group.
-- **Record yourself** with the front camera while the tutorial plays. You see
+- **Record yourself** with the front or back camera while the tutorial plays. You see
   the tutorial as a see-through "ghost" over your camera image (default), or
   yourself live next to the tutorial. The camera records video only; the music
   comes from the tutorial.
@@ -348,7 +348,7 @@ eightcount/
     ├── Grid/                           CountGrid math, tap tempo, tempo sheet,
     │                                   8-count list, note editor, snapshot viewer, NoteStore
     ├── Transfer/                       export/import file format, share sheet
-    ├── Recording/                      front camera recorder, record screen
+    ├── Recording/                      front or back camera recorder, record screen
     ├── Compare/                        synced two-video playback, compare screen, takes list
     ├── Analysis/                       body-pose extraction (Vision), comparison,
     │                                   coach tips (Apple Foundation Models), results screen
@@ -529,7 +529,7 @@ runs after every change, results under the repo's **Actions** tab):
 
 **Not testable there** (no camera, no real person, no Apple Intelligence in
 the simulator), so please check these on your iPhone: recording with the
-front camera, real dance analysis, the Apple-Intelligence tips, and signing
+front or back camera, real dance analysis, the Apple-Intelligence tips, and signing
 with your Apple ID.
 
 The lists below were written before the code could be compiled. They're

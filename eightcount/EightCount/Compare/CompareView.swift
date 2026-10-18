@@ -37,9 +37,9 @@ struct CompareView: View {
 
     /// true = two videos next to each other, false = ghost overlay (default).
     @State private var isSideBySide = false
-    /// Your video is flipped by default, like looking in a mirror.
-    /// (The recorded file itself is NOT mirrored.)
-    @State private var mirrorMe = true
+    /// Front-camera takes start flipped, like a mirror. Back-camera takes
+    /// start unflipped. (The recorded file itself is NOT mirrored.)
+    @State private var mirrorMe: Bool
     @State private var mirrorTutorial: Bool
     /// How visible the tutorial ghost is in ghost mode.
     @State private var ghostOpacity = 0.5
@@ -89,6 +89,7 @@ struct CompareView: View {
         self.autoPlay = autoPlay
         self.onRecordAgain = onRecordAgain
         _playback = State(initialValue: SyncedPlayback(project: project, take: take))
+        _mirrorMe = State(initialValue: !take.backCamera)
         _mirrorTutorial = State(initialValue: tutorialMirrored)
         _report = State(initialValue: take.analysisReport)
     }
