@@ -121,6 +121,10 @@ User asked for (subagents must use model "sonnet" to save tokens):
 
 - Moved EightCount to its own public repo splatfire/eightcount-app (branch main), full history kept.
 
+- Cloud agents run on Linux, so they still cannot build the iPhone app. Swift 6.4.1 is
+  installed there so the plain 8-count, take-timing, and watch-message math can be run.
+  See AGENTS.md section 5.
+
 ## Next step
 - User tests on device: camera recording, real analysis, Apple Intelligence tips; report any issues.
 - Free Apple ID: re-run `./setup-mac.sh --install --no-open` every 7 days.

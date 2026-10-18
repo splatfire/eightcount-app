@@ -54,3 +54,27 @@ other agent. The owner switches between these apps; this file and
   guessing. Cite sources for facts from the web.
 - Things only the owner can do (Apple ID, paying, tapping "Trust" on the
   iPhone, App Store Connect): explain step by step.
+
+## 5. Cloud agents (Linux)
+
+Cursor cloud agents run on Ubuntu, not a Mac. They cannot install Xcode,
+so they cannot build the iPhone app, open the simulator, or install on a
+phone. That still happens on the owner's Mac:
+
+```sh
+cd eightcount && ./setup-mac.sh
+```
+
+GitHub Actions (Xcode 27 and 26) is the compile check.
+
+The cloud machine has Swift 6.4.1 on `PATH` (`swift` and `swiftc` in
+`/usr/local/bin`, toolchain in `/opt/swift`). Use it to run the plain math
+the app is built on. Compile these three files together with a driver
+named `main.swift` (any other file name is treated as a library and
+top-level code is rejected):
+
+- `eightcount/EightCount/Grid/CountGrid.swift` (8-counts)
+- `eightcount/EightCount/Services/TakeTiming.swift` (lining up a take)
+- `eightcount/Shared/WatchProtocol.swift` (Apple Watch messages)
+
+A green run of that math is not a green iPhone build.
