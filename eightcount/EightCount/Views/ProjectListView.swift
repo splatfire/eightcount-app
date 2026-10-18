@@ -81,12 +81,12 @@ struct ProjectListView: View {
             do {
                 let project = try ProjectArchive.importProject(from: url, into: modelContext)
                 path = [project]
+                // Files handed over by other apps are copied into our Inbox folder: tidy up.
+                if url.path(percentEncoded: false).contains("/Inbox/") {
+                    try? FileManager.default.removeItem(at: url)
+                }
             } catch {
                 errorMessage = error.localizedDescription
-            }
-            // Files handed over by other apps are copied into our Inbox folder: tidy up.
-            if url.path(percentEncoded: false).contains("/Inbox/") {
-                try? FileManager.default.removeItem(at: url)
             }
         }
         // Import a project file that was exported from this app.
@@ -283,10 +283,21 @@ struct ProjectListView: View {
 
     private func delete(_ project: Project) {
         path.removeAll { $0.id == project.id }
-        VideoStorage.deleteVideo(named: project.videoFileName)
-        TakeStore.deleteTakeFiles(of: project)   // your recordings
+        let videoFileName = project.videoFileName
+        let takeFileNames = project.takes.map(\.fileName)
         modelContext.delete(project)   // notes and snapshots are deleted too (cascade)
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            errorMessage = error.localizedDescription
+            projectToDelete = nil
+            return
+        }
+        VideoStorage.deleteVideo(named: videoFileName)
+        for fileName in takeFileNames {
+            VideoStorage.deleteVideo(named: fileName)
+        }
         projectToDelete = nil
     }
 }
