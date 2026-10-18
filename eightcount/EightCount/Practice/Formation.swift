@@ -246,8 +246,14 @@ struct FormationEditorSheet: View {
         VStack(spacing: 10) {
             if let i = formation.dancers.firstIndex(where: { $0.id == selectedID }) {
                 HStack(spacing: 10) {
-                    TextField("Name", text: $formation.dancers[i].name)
-                        .textFieldStyle(.roundedBorder)
+                    TextField("Name", text: Binding(
+                        get: { formation.dancers[i].name },
+                        set: { name in
+                            formation.dancers[i].name = name
+                            copiedFrom = nil
+                        }
+                    ))
+                    .textFieldStyle(.roundedBorder)
                     Toggle("Me", isOn: Binding(
                         get: { formation.dancers[i].isMe },
                         set: { on in

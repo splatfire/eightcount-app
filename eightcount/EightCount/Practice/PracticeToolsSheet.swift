@@ -110,7 +110,7 @@ struct PracticeToolsSheet: View {
                 }
                 if partID == nil {
                     Stepper(value: $length, in: 2...16) {
-                        Text("\(length) 8-counts (\(hereStart + 1)–\(min(hereStart + length, count)))")
+                        Text(lengthLabel)
                             .monospacedDigit()
                     }
                 }
@@ -158,6 +158,12 @@ struct PracticeToolsSheet: View {
                 Text(detail).font(.caption).foregroundStyle(Theme.secondaryText)
             }
         }
+    }
+
+    private var lengthLabel: String {
+        let endNumber = min(hereStart + length, count)
+        let shown = endNumber - hereStart
+        return "\(shown) 8-count\(shown == 1 ? "" : "s") (\(hereStart + 1)–\(endNumber))"
     }
 
     private var chosenPart: (first: Int, last: Int, name: String?) {

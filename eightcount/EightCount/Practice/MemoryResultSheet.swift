@@ -22,8 +22,10 @@ struct MemoryResultSheet: View {
     private var indexes: [Int] {
         let grid = CountGrid.unbounded(bpm: project.bpm, offset: project.offset)
         guard grid.isValid else { return [] }
-        let first = grid.index(at: take.tutorialStart) ?? 0
-        let last = grid.index(at: max(take.tutorialEnd - 0.05, take.tutorialStart)) ?? first
+        let firstIndex = grid.index(at: take.tutorialStart)
+        let lastIndex = grid.index(at: max(take.tutorialEnd - 0.05, take.tutorialStart))
+        guard let last = lastIndex else { return [] }
+        let first = firstIndex ?? 0
         let upper = project.eightCountTotal > 0 ? min(last, project.eightCountTotal - 1) : last
         return upper >= first ? Array(first...upper) : []
     }

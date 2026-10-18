@@ -232,7 +232,7 @@ enum BeatDetector {
         var env = [Float](repeating: 0, count: frames)
         for i in 0..<frames {
             let lo = max(0, i - radius), hi = min(frames, i + radius + 1)
-            let mean = (prefix[hi] - prefix[lo]) / Double(width)
+            let mean = (prefix[hi] - prefix[lo]) / Double(hi - lo)
             env[i] = max(flux[i] - Float(mean), 0)
         }
         let peak = env.max() ?? 0
