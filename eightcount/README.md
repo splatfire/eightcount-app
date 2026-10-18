@@ -43,8 +43,9 @@ tutorial and dance-practice videos:
   tutorial is hidden, then you tick the 8-counts you forgot).
 - **Formation map**: draw where everyone stands per 8-count; a mini map shows
   on the video and in the list.
-- **Practice streak** on the home screen and optional **review reminders**
-  (a notification two days after you practised a dance).
+- **Practice streak** on the home screen, a **daily streak reminder** at a
+  time you pick, and optional **review reminders** (a notification two days
+  after you practised a dance).
 - **AirPlay to a TV**: the video plays on the TV, the phone (and watch) are
   the remote. **Landscape** practice screen. **Open project files** straight
   from AirDrop, Messages or Files.
@@ -463,8 +464,9 @@ tools need to know where each 8-count is.
   previous formation. A mini map appears in the list and on the video
   (switch it off in ✦ → On the video).
 - **Streak and reminders**: practise a minute (or record a take) to count the
-  day. Turn on reminders under ⚙ on the home screen: two days after you
-  practised a dance, at 18:00, you get a "time to review" notification.
+  day. Turn on **Daily streak reminder** on the home screen and pick a time.
+  Turn on review reminders under ⚙: two days after you practised a dance,
+  at 18:00, you get a "time to review" notification.
 - **TV**: tap the AirPlay button on the video (next to ✦) and pick your
   Apple TV or AirPlay TV. The TV shows the video without mirroring.
 - **Landscape**: turn the phone sideways on the practice screen: video and

@@ -17,6 +17,8 @@ struct ProjectListView: View {
     @State private var renameSection = ""
     @State private var errorMessage: String?
     @AppStorage(PracticeLog.remindersKey) private var reviewReminders = false
+    @AppStorage(PracticeLog.streakReminderKey) private var streakReminder = false
+    @AppStorage(PracticeLog.streakReminderMinutesKey) private var streakReminderMinutes = 19 * 60
     @State private var showAbout = false
     private var log: PracticeLog { PracticeLog.shared }
 
@@ -149,7 +151,7 @@ struct ProjectListView: View {
                 .font(.title2)
                 .foregroundStyle(streak > 0 ? Color.orange : Theme.secondaryText)
             VStack(alignment: .leading, spacing: 2) {
-                Text(streak == 1 ? "1 day of practice" : "\(streak) days in a row")
+                Text(streak == 0 ? "No streak yet" : (streak == 1 ? "1 day of practice" : "\(streak) days in a row"))
                     .font(.headline)
                 Text(log.practisedToday ? "You practised today. Nice!"
                                         : (streak > 0 ? "Practise today to keep your streak." : "Practise a minute to start a streak."))
@@ -160,6 +162,47 @@ struct ProjectListView: View {
         }
         .listRowBackground(Theme.surface)
         .accessibilityElement(children: .combine)
+    }
+
+    /// Turning reminders on asks iOS for permission first.
+    private var streakReminderBinding: Binding<Bool> {
+        Binding(
+            get: { streakReminder },
+            set: { on in
+                if on {
+                    Task {
+                        let allowed = await PracticeLog.shared.requestPermission()
+                        streakReminder = allowed
+                        if !allowed {
+                            errorMessage = "Notifications are off for EightCount. Turn them on in Settings → Notifications → EightCount."
+                        }
+                        PracticeLog.shared.scheduleStreakReminders()
+                    }
+                } else {
+                    streakReminder = false
+                    PracticeLog.shared.scheduleStreakReminders()
+                }
+            }
+        )
+    }
+
+    /// Minutes after midnight <-> today at that time.
+    private var reminderTimeBinding: Binding<Date> {
+        Binding(
+            get: {
+                let calendar = Calendar.current
+                var parts = calendar.dateComponents([.year, .month, .day], from: .now)
+                let minutes = min(max(streakReminderMinutes, 0), 23 * 60 + 59)
+                parts.hour = minutes / 60
+                parts.minute = minutes % 60
+                return calendar.date(from: parts) ?? .now
+            },
+            set: { newValue in
+                let parts = Calendar.current.dateComponents([.hour, .minute], from: newValue)
+                streakReminderMinutes = (parts.hour ?? 19) * 60 + (parts.minute ?? 0)
+                PracticeLog.shared.scheduleStreakReminders()
+            }
+        )
     }
 
     /// Turning reminders on asks iOS for permission first.
@@ -187,9 +230,14 @@ struct ProjectListView: View {
     /// system draws the rounded card, the chevron and the spacing for us).
     private var list: some View {
         List {
-            if log.streak > 0 || !log.days.isEmpty {
-                Section {
-                    streakRow
+            Section {
+                streakRow
+                Toggle("Daily streak reminder", isOn: streakReminderBinding)
+                    .tint(Theme.accent)
+                    .listRowBackground(Theme.surface)
+                if streakReminder {
+                    DatePicker("Remind me at", selection: reminderTimeBinding, displayedComponents: .hourAndMinute)
+                        .listRowBackground(Theme.surface)
                 }
             }
             ForEach(projects) { project in

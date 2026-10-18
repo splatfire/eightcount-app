@@ -24,7 +24,7 @@ The developer cannot see any of it.
   on your iPhone.
 - **Photos** – to import a dance video you pick, and to save a video to your
   library when you tap "Save to Photos".
-- **Notifications** (only if you turn on review reminders) – local reminders
+- **Notifications** (only if you turn on the daily streak reminder or review reminders) – local reminders
   created on your iPhone. Nothing is sent to a server.
 
 ## Features that use Apple technology on your device
