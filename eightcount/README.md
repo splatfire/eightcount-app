@@ -89,8 +89,8 @@ project and a small tool called **XcodeGen** turns it into one.
 ### 1.2 Get the code onto your Mac
 
 ```sh
-git clone -b claude/nice-bardeen-84bg5p https://github.com/splatfire/splatfire.git
-cd splatfire/eightcount
+git clone https://github.com/splatfire/eightcount-app.git
+cd eightcount-app/eightcount
 ```
 
 (Already cloned? Run `git pull` inside the `splatfire` folder instead.)
@@ -119,7 +119,7 @@ Xcode 26, after every change ("EightCount iOS build" under the repo's
 ### 1.3 Generate and open the project (manual way)
 
 ```sh
-cd path/to/splatfire/eightcount      # the folder that contains project.yml
+cd path/to/eightcount-app/eightcount      # the folder that contains project.yml
 xcodegen generate
 open EightCount.xcodeproj
 ```
@@ -182,7 +182,7 @@ window to put it into its Photos app.
 1. One time, run this to put an **"Update EightCount"** icon on your
    Desktop:
    ```sh
-   ~/splatfire/eightcount/setup-mac.sh --shortcut
+   ~/eightcount-app/eightcount/setup-mac.sh --shortcut
    ```
 2. From then on, **double-click "Update EightCount"**. It downloads my newest
    changes and installs them on your iPhone **over Wi-Fi**. The iPhone must
@@ -193,7 +193,7 @@ window to put it into its Photos app.
    stay.
 4. **Or let the Mac do it automatically:**
    ```sh
-   ~/splatfire/eightcount/setup-mac.sh --auto-refresh
+   ~/eightcount-app/eightcount/setup-mac.sh --auto-refresh
    ```
    A small background job checks every 3 hours. About once a day, when
    the Mac is awake and your iPhone is on the same Wi-Fi and unlocked, it
@@ -268,7 +268,7 @@ You can continue in **Cursor** on your Mac or in the **Claude app** – they
 stay in sync through GitHub, and both read the same notes about where you
 left off (`HANDOFF.md`, rules in `AGENTS.md`).
 
-1. In Cursor: **File → Open Folder… → `splatfire`** (the whole folder, not
+1. In Cursor: **File → Open Folder… → `eightcount-app`** (the whole folder, not
    only `eightcount`). Sign in to GitHub in Cursor when it asks (needed to send
    your work back).
 2. Start each session by telling the AI: **"start"** (it runs
@@ -276,7 +276,7 @@ left off (`HANDOFF.md`, rules in `AGENTS.md`).
 3. Before switching apps, tell it: **"save and hand off"** (it updates
    `HANDOFF.md` and runs `./handoff.sh save "…"`).
 4. Use one app at a time. In Terminal you can do the same yourself:
-   `cd ~/splatfire && ./handoff.sh start` / `./handoff.sh save "what I did"`.
+   `cd ~/eightcount-app && ./handoff.sh start` / `./handoff.sh save "what I did"`.
 
 ## 2. Free Apple ID vs. paid Apple Developer Program
 

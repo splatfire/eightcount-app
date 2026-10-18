@@ -4,6 +4,10 @@ _Last updated: 18 October 2026 · by Claude Code (cloud session)_
 
 ## State right now
 
+- **Moved to its own repo:** github.com/splatfire/eightcount-app (branch
+  `main`). On the Mac the new folder is `~/eightcount-app` (the old
+  `~/splatfire` is no longer used for the app).
+
 - EightCount builds and all CI checks are green (Xcode 27 + 26, UI tests on
   iPhone 6.9" and iPad 13" simulators).
 - Recent work: App Store prep (privacy manifest, `eightcount/PRIVACY.md`,

@@ -31,8 +31,9 @@ other agent. The owner switches between these apps; this file and
   Vision, FoundationModels), iOS 17+, Apple Watch remote (watchOS 10).
   Everything is in `eightcount/`. Details: `eightcount/README.md`,
   App Store steps: `eightcount/APPSTORE.md`.
-- **Branch:** `claude/nice-bardeen-84bg5p` (pull request #1 on GitHub,
-  base `claude/awesome-pascal-vu7dpb`). Work and push on this branch.
+- **Repo:** github.com/splatfire/eightcount-app, branch `main`. Work and push
+  on `main` (history before 18 Oct 2026: splatfire/splatfire, branch
+  `claude/nice-bardeen-84bg5p`).
 - The Xcode project is GENERATED: edit `eightcount/project.yml`, then
   `xcodegen generate`. Never edit or commit `EightCount.xcodeproj`.
 - Build / install on the owner's iPhone: `cd eightcount && ./setup-mac.sh --update`

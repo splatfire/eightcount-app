@@ -10,7 +10,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-BRANCH="claude/nice-bardeen-84bg5p"
+BRANCH="main"
 
 on_branch() {
   local current

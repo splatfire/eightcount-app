@@ -12,7 +12,7 @@ This repo is worked on with BOTH Cursor and Claude Code. The full rules are in
 - **End of every session / after finishing a piece of work:** update
   `HANDOFF.md` (date, "by Cursor", what you did, next steps, open questions),
   add a line to `PROGRESS.md`, then run `./handoff.sh save "what you did"`
-  (commits and pushes to GitHub, branch `claude/nice-bardeen-84bg5p`).
+  (commits and pushes to GitHub, branch `main`).
 - The owner is a beginner: plain words, do the work yourself, and never make
   things up – say when you're not sure and ask for missing information.
 - The app is in `eightcount/`. Never edit `EightCount.xcodeproj` (generated

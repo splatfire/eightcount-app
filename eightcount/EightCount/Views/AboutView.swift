@@ -5,8 +5,8 @@ import SwiftUI
 struct AboutView: View {
     @Environment(\.dismiss) private var dismiss
 
-    static let privacyURL = URL(string: "https://github.com/splatfire/splatfire/blob/claude/nice-bardeen-84bg5p/eightcount/PRIVACY.md")!
-    static let supportURL = URL(string: "https://github.com/splatfire/splatfire/issues")!
+    static let privacyURL = URL(string: "https://github.com/splatfire/eightcount-app/blob/main/eightcount/PRIVACY.md")!
+    static let supportURL = URL(string: "https://github.com/splatfire/eightcount-app/issues")!
 
     private var version: String {
         let info = Bundle.main.infoDictionary

@@ -19,4 +19,4 @@ built with Xcode 27. The owner is a beginner — explain in plain words, do the 
   `#if compiler(>=6.2)` + `#available(iOS 26.0, *)` in `EightCount/Design/Glass.swift`.
 - UI test: `EightCountUITests` (needs `-seedDemo` + SEED_VIDEO, see
   `.github/workflows/eightcount-ios-build.yml`). CI builds with Xcode 27 + 26 on every push.
-- Branch: `claude/nice-bardeen-84bg5p`. Progress log: `../PROGRESS.md`. Docs: `README.md`.
+- Branch: `main`. Progress log: `../PROGRESS.md`. Docs: `README.md`.

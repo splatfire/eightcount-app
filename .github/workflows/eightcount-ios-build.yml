@@ -6,7 +6,7 @@ name: EightCount iOS build
 
 on:
   push:
-    branches: [claude/nice-bardeen-84bg5p]
+    branches: [main]
     paths:
       - "eightcount/**"
       - ".github/workflows/eightcount-ios-build.yml"

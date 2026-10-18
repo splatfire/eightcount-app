@@ -13,7 +13,7 @@ name: EightCount TestFlight
 
 on:
   push:
-    branches: [claude/nice-bardeen-84bg5p]
+    branches: [main]
     paths:
       - "eightcount/EightCount/**"
       - "eightcount/project.yml"

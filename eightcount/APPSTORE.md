@@ -45,7 +45,7 @@ Apple's websites. Everything else is already done in this repository.
    (developer.apple.com → Account → Membership details).
 2. In Terminal:
    ```sh
-   cd ~/splatfire/eightcount && ./setup-mac.sh --install --team YOURTEAMID
+   cd ~/eightcount-app/eightcount && ./setup-mac.sh --install --team YOURTEAMID
    ```
    From now on installs on your iPhone last a **year**, not 7 days.
 
@@ -74,7 +74,7 @@ Apple's websites. Everything else is already done in this repository.
 2. Download the `.p8` key file (only possible once!). Note the **Key ID** and
    the **Issuer ID** shown above the list.
 3. In Terminal: `base64 -i ~/Downloads/AuthKey_XXXXXXXXXX.p8 | pbcopy`
-4. GitHub → splatfire/splatfire → **Settings → Secrets and variables →
+4. GitHub → splatfire/eightcount-app → **Settings → Secrets and variables →
    Actions → New repository secret**, four times:
    `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8_BASE64` (paste), `APPLE_TEAM_ID`.
 
@@ -107,10 +107,9 @@ No account, no ads, no tracking. Your videos never leave your iPhone.
 **Keywords** (100 characters max):
 `dance,choreography,kpop,dance practice,8 count,mirror,slow motion,loop,tutorial,learn dance`
 
-**Support URL:** <https://github.com/splatfire/splatfire/issues>
+**Support URL:** <https://github.com/splatfire/eightcount-app/issues>
 **Privacy Policy URL:**
-<https://github.com/splatfire/splatfire/blob/claude/nice-bardeen-84bg5p/eightcount/PRIVACY.md>
-(change it to the main branch once the pull request is merged)
+<https://github.com/splatfire/eightcount-app/blob/main/eightcount/PRIVACY.md>
 
 **Category:** Health & Fitness (secondary: Education)
 

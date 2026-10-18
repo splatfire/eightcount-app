@@ -54,4 +54,4 @@ If this policy changes, the new version will be posted here with a new date.
 
 ## Contact
 
-Questions: open an issue at <https://github.com/splatfire/splatfire/issues>.
+Questions: open an issue at <https://github.com/splatfire/eightcount-app/issues>.
