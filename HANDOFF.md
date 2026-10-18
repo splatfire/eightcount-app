@@ -2,6 +2,16 @@
 
 _Last updated: 18 October 2026 · by Cursor (cloud session)_
 
+**Open PRs (owner merges on GitHub, all CI green):**
+- PR #3 – record screen: front/back camera switch, "From the beginning",
+  "Play loop" warm-up (https://github.com/splatfire/eightcount-app/pull/3)
+- PR #4 – daily streak reminder (https://github.com/splatfire/eightcount-app/pull/4)
+- PR #5 – practice screen: swipe up on the video / push the 8-count list up
+  to make a big video small, swipe down for big
+  (https://github.com/splatfire/eightcount-app/pull/5)
+PR #3 and #4 also edit HANDOFF.md/PROGRESS.md: if GitHub shows a conflict
+there when merging the second/third one, ask the next session to fix it.
+
 ## State right now
 
 - **Moved to its own repo:** github.com/splatfire/eightcount-app (branch
