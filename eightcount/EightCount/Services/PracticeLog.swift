@@ -19,6 +19,9 @@ final class PracticeLog {
 
     private static let daysKey = "practiceDays"
     static let remindersKey = "reviewReminders"
+    /// Daily streak reminder on/off, and the time as minutes after midnight (7 pm).
+    static let streakReminderKey = "streakReminder"
+    static let streakReminderMinutesKey = "streakReminderMinutes"
     /// Review reminder: this many days after you last practised a project, at 18:00.
     static let reviewAfterDays = 2
 
@@ -51,7 +54,8 @@ final class PracticeLog {
     /// Call when you've practised `project` (played a minute / recorded a take).
     func recordPractice(of project: Project) {
         let today = Self.key(.now)
-        if !days.contains(today) {
+        let isNewDay = !days.contains(today)
+        if isNewDay {
             days.insert(today)
             // Keep about a year.
             let sorted = days.sorted()
@@ -60,6 +64,57 @@ final class PracticeLog {
         }
         if UserDefaults.standard.bool(forKey: Self.remindersKey) {
             scheduleReview(of: project)
+        }
+        // Today's reminder should disappear once this day counts.
+        if isNewDay {
+            scheduleStreakReminders()
+        }
+    }
+
+    /// One reminder a day for the next week, at the time chosen on the home screen.
+    /// A missed day ends the streak, so only the first upcoming one names the number.
+    func scheduleStreakReminders() {
+        let center = UNUserNotificationCenter.current()
+        let identifiers = (0...6).map { "streak-\($0)" }
+        center.removePendingNotificationRequests(withIdentifiers: identifiers)
+        guard UserDefaults.standard.bool(forKey: Self.streakReminderKey) else { return }
+
+        // A missing value means 7 pm. Keep it on the clock or iOS drops the notification.
+        let stored = UserDefaults.standard.object(forKey: Self.streakReminderMinutesKey) as? Int ?? 1140
+        let minutes = min(max(stored, 0), 23 * 60 + 59)
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: .now)
+        let streakCount = streak
+        let practised = practisedToday
+
+        for offset in 0...6 {
+            guard let day = calendar.date(byAdding: .day, value: offset, to: startOfToday) else { continue }
+            var when = calendar.dateComponents([.year, .month, .day], from: day)
+            when.hour = minutes / 60
+            when.minute = minutes % 60
+            if offset == 0 {
+                if practised { continue }
+                guard let fire = calendar.date(from: when), fire > .now else { continue }
+            }
+
+            let content = UNMutableNotificationContent()
+            content.sound = .default
+            if offset == 0, streakCount > 0 {
+                content.title = "Keep your \(streakCount)-day streak! 🔥"
+                content.body = "A minute of practice today keeps it going."
+            } else if offset == 0 {
+                content.title = "Time to dance! 💃"
+                content.body = "Practise a minute today to start a streak."
+            } else if offset == 1, practised, streakCount > 0 {
+                content.title = "Keep your \(streakCount)-day streak! 🔥"
+                content.body = "Practise a minute today so you don't lose it."
+            } else {
+                content.title = "Your dances miss you 💃"
+                content.body = "Practise a minute today to start a new streak."
+            }
+            let trigger = UNCalendarNotificationTrigger(dateMatching: when, repeats: false)
+            let request = UNNotificationRequest(identifier: "streak-\(offset)", content: content, trigger: trigger)
+            center.add(request)
         }
     }
 
