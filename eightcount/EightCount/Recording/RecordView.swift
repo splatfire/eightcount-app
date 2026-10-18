@@ -430,18 +430,23 @@ struct RecordView: View {
     }
 
     private var infoText: String {
-        var text = "Starts at \(formatTime(startTime)) · \(Self.rateText(rate))"
-        if let endTime, endTime > startTime {
-            text += " · until \(formatTime(endTime))"
+        let start = model.startTime
+        var text = "Starts at \(formatTime(start)) · \(Self.rateText(rate))"
+        if let end = model.endTime, end > start {
+            text += " · until \(formatTime(end))"
         }
         return text
     }
 
-    /// Ghost slider (ghost mode only), a small info caption and the record button.
+    /// Ghost slider (ghost mode only), the start choice, the info caption, the record button.
     private var bottomControls: some View {
         VStack(spacing: 12) {
             if layout == .ghost {
                 ghostOpacityRow
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+            if model.phase == .idle && model.canChooseStart {
+                startFromBeginningButton
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
             Text(infoText)
@@ -455,6 +460,36 @@ struct RecordView: View {
         }
         .padding(.top, 8)
         .animation(.snappy, value: layout)
+        .animation(.snappy, value: model.phase)
+        .animation(.snappy, value: model.isFromBeginning)
+        .animation(.snappy, value: model.canChooseStart)
+    }
+
+    /// Disabled until the tutorial item can seek (`moveToStart` returns early before that).
+    private var startFromBeginningButton: some View {
+        let title = model.isFromBeginning
+            ? "Back to \(formatTime(model.chosenStartTime))"
+            : "From the beginning"
+        let symbol = model.isFromBeginning ? "arrow.uturn.forward" : "backward.end.fill"
+        let ready = model.tutorial.isReady
+        return Button {
+            model.toggleStartFromBeginning()
+        } label: {
+            Label(title, systemImage: symbol)
+                .font(.system(.caption, design: .rounded).weight(.medium))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .foregroundStyle(Color.white)
+                .padding(.horizontal, 14)
+                .frame(height: 34)
+                .glassSurface(Capsule(), interactive: true, fallback: Theme.surface.opacity(0.85))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(!ready)
+        .opacity(ready ? 1 : 0.4)
+        .accessibilityLabel(title)
     }
 
     /// Slim slider for how see-through the tutorial "ghost" is.
@@ -732,7 +767,12 @@ private final class RecordSessionModel {
     @ObservationIgnored private var project: Project?
     @ObservationIgnored private var context: ModelContext?
     @ObservationIgnored private var onFinished: ((Take?) -> Void)?
-    @ObservationIgnored private var startTime: Double = 0
+    private(set) var startTime: Double = 0
+    /// Nil plays through to the end of the video.
+    private(set) var endTime: Double? = nil
+    /// Practice spot. Must stay put while `startTime` / `endTime` toggle.
+    @ObservationIgnored private var chosenStart: Double = 0
+    @ObservationIgnored private var chosenEnd: Double? = nil
     @ObservationIgnored private var rate: Double = 1
     @ObservationIgnored private var didSetUp = false
     @ObservationIgnored private var didFinish = false
@@ -766,6 +806,9 @@ private final class RecordSessionModel {
     var isLayoutLocked: Bool {
         phase == .starting || phase == .countdown || phase == .finishing
     }
+    var chosenStartTime: Double { chosenStart }
+    var isFromBeginning: Bool { startTime == 0 && chosenStart > 0 }
+    var canChooseStart: Bool { chosenStart > 0.5 }
 
     // MARK: Lifecycle
 
@@ -776,12 +819,30 @@ private final class RecordSessionModel {
         self.project = project
         self.context = context
         self.onFinished = onFinished
+        // Practice spot first, so a refresh from the start/end write already sees it.
+        self.chosenStart = startTime
+        self.chosenEnd = endTime
         self.startTime = startTime
+        self.endTime = endTime
         self.rate = rate
         tutorial.onReachedEnd = { [weak self] in
             self?.tutorialReachedEnd()
         }
         tutorial.configure(startTime: startTime, endTime: endTime, rate: Float(rate))
+    }
+
+    /// Idle only. `endTime = nil` plays through to the end of the video.
+    func toggleStartFromBeginning() {
+        guard phase == .idle else { return }
+        if isFromBeginning {
+            startTime = chosenStart
+            endTime = chosenEnd
+        } else {
+            startTime = 0
+            endTime = nil
+        }
+        tutorial.configure(startTime: startTime, endTime: endTime, rate: Float(rate))
+        tutorial.moveToStart()
     }
 
     /// Prepares sound, tutorial and camera.
