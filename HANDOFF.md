@@ -8,12 +8,10 @@ _Last updated: 18 October 2026 · by Cursor (cloud session)_
   `main`). On the Mac the new folder is `~/eightcount-app` (the old
   `~/splatfire` is no longer used for the app).
 
-- **New: code review fixes waiting in a pull request** –
-  https://github.com/splatfire/eightcount-app/pull/2 (branch
-  `cursor/code-review-fixes-c99b`, not merged into `main` yet). It has crash
-  guards for imported files, safer deletes, playback/export race fixes and
-  small logic fixes. CI now also runs on pull requests. Once CI is green and
-  the owner agrees, merge it on GitHub (the owner presses "Merge").
+- **Code review fixes merged into `main`** (PR #2,
+  https://github.com/splatfire/eightcount-app/pull/2): crash guards for
+  imported files, safer deletes, playback/export race fixes, small logic
+  fixes. CI now also runs on pull requests.
 - `main` builds and all CI checks are green (Xcode 27 + 26, UI tests on
   iPhone 6.9" and iPad 13" simulators).
 - Earlier work: App Store prep (privacy manifest, `eightcount/PRIVACY.md`,
@@ -24,7 +22,7 @@ _Last updated: 18 October 2026 · by Cursor (cloud session)_
 
 ## Waiting on the owner
 
-1. Look at PR #2 and merge it if CI is green (or ask the next session to).
+1. Run `./setup-mac.sh --update` to get the review fixes on the iPhone.
 2. Join the Apple Developer Program (99 USD/year), then follow
    `eightcount/APPSTORE.md` from step 2.
 3. Test on the iPhone after `./setup-mac.sh --update`:
@@ -56,5 +54,5 @@ _Last updated: 18 October 2026 · by Cursor (cloud session)_
 
 ## Half-finished / caution
 
-- PR #2 is open (see above); `main` does not have those fixes yet.
+- Nothing half-finished.
 - Don't build App Store uploads with a beta Xcode.
