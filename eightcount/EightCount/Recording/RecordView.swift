@@ -445,9 +445,14 @@ struct RecordView: View {
                 ghostOpacityRow
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
-            if model.phase == .idle && model.canChooseStart {
-                startFromBeginningButton
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            if model.phase == .idle {
+                HStack(spacing: 8) {
+                    loopButton
+                    if model.canChooseStart {
+                        startFromBeginningButton
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
             Text(infoText)
                 .font(.system(.caption, design: .rounded).weight(.medium))
@@ -465,6 +470,21 @@ struct RecordView: View {
         .animation(.snappy, value: model.canChooseStart)
     }
 
+    /// Warm-up: the tutorial plays the section on repeat until you record.
+    private var loopButton: some View {
+        let title = model.isLooping ? "Stop loop" : "Play loop"
+        let ready = model.tutorial.isReady
+        return Button {
+            model.toggleLoop()
+        } label: {
+            chipLabel(title, systemImage: model.isLooping ? "stop.fill" : "repeat")
+        }
+        .buttonStyle(.plain)
+        .disabled(!ready)
+        .opacity(ready ? 1 : 0.4)
+        .accessibilityLabel(title)
+    }
+
     /// Disabled until the tutorial item can seek (`moveToStart` returns early before that).
     private var startFromBeginningButton: some View {
         let title = model.isFromBeginning
@@ -475,21 +495,25 @@ struct RecordView: View {
         return Button {
             model.toggleStartFromBeginning()
         } label: {
-            Label(title, systemImage: symbol)
-                .font(.system(.caption, design: .rounded).weight(.medium))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .foregroundStyle(Color.white)
-                .padding(.horizontal, 14)
-                .frame(height: 34)
-                .glassSurface(Capsule(), interactive: true, fallback: Theme.surface.opacity(0.85))
-                .contentShape(Capsule())
+            chipLabel(title, systemImage: symbol)
         }
         .buttonStyle(.plain)
         .disabled(!ready)
         .opacity(ready ? 1 : 0.4)
         .accessibilityLabel(title)
+    }
+
+    private func chipLabel(_ title: String, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(.system(.caption, design: .rounded).weight(.medium))
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .foregroundStyle(Color.white)
+            .padding(.horizontal, 14)
+            .frame(height: 34)
+            .glassSurface(Capsule(), interactive: true, fallback: Theme.surface.opacity(0.85))
+            .contentShape(Capsule())
     }
 
     /// Slim slider for how see-through the tutorial "ghost" is.
@@ -809,6 +833,7 @@ private final class RecordSessionModel {
     var chosenStartTime: Double { chosenStart }
     var isFromBeginning: Bool { startTime == 0 && chosenStart > 0 }
     var canChooseStart: Bool { chosenStart > 0.5 }
+    var isLooping: Bool { tutorial.isLooping }
 
     // MARK: Lifecycle
 
@@ -843,6 +868,16 @@ private final class RecordSessionModel {
         }
         tutorial.configure(startTime: startTime, endTime: endTime, rate: Float(rate))
         tutorial.moveToStart()
+    }
+
+    /// Idle only. Plays the section on repeat, or stops it at the start.
+    func toggleLoop() {
+        guard phase == .idle else { return }
+        if tutorial.isLooping {
+            tutorial.moveToStart()
+        } else {
+            tutorial.startLoop()
+        }
     }
 
     /// Prepares sound, tutorial and camera.
@@ -891,6 +926,8 @@ private final class RecordSessionModel {
 
     private func startRecordingFlow() {
         guard canStart else { return }
+        // The jump back to the start finishes long before the countdown ends.
+        if tutorial.isLooping { tutorial.moveToStart() }
         let fileName = TakeStore.newTakeFileName()
         let url = VideoStorage.url(forFileName: fileName)
 
@@ -1105,6 +1142,8 @@ private final class RecordTutorialPlayer {
     /// True when the first frame is shown and the player can start.
     private(set) var isReady = false
     private(set) var loadError: String? = nil
+    /// True while the section plays on repeat before recording (with music).
+    private(set) var isLooping = false
 
     /// Called when playback reaches the end time (or the end of the video).
     @ObservationIgnored var onReachedEnd: (@MainActor () -> Void)?
@@ -1121,6 +1160,8 @@ private final class RecordTutorialPlayer {
     @ObservationIgnored private var watchingEnd = false
     /// Bumped on every seek so old seek callbacks are ignored.
     @ObservationIgnored private var seekGeneration = 0
+    /// The loop is jumping back to the start: don't jump again meanwhile.
+    @ObservationIgnored private var isLoopSeeking = false
 
     private static let timeScale: CMTimeScale = 60_000
 
@@ -1161,6 +1202,8 @@ private final class RecordTutorialPlayer {
 
     /// Back to the start time, paused, so the first frame shows again.
     func moveToStart() {
+        isLooping = false
+        isLoopSeeking = false
         guard let item = player.currentItem, item.status == .readyToPlay else { return }
         isReady = false
         isHeld = true
@@ -1175,6 +1218,33 @@ private final class RecordTutorialPlayer {
             guard let self else { return }
             Task { @MainActor in
                 self.seekFinished(finished, generation: generation)
+            }
+        }
+    }
+
+    /// Plays from the start time to the end time (or the end of the video)
+    /// over and over, to warm up. `moveToStart()` stops it and shows the
+    /// first frame again.
+    func startLoop() {
+        guard isReady, !isLooping, player.currentItem?.status == .readyToPlay else { return }
+        isLooping = true
+        isLoopSeeking = false
+        isHeld = false
+        watchingEnd = false
+        player.playImmediately(atRate: rate)
+    }
+
+    private func restartLoop() {
+        isLoopSeeking = true
+        seekGeneration += 1
+        let generation = seekGeneration
+        let target = CMTime(seconds: startSeconds, preferredTimescale: Self.timeScale)
+        player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in
+                guard generation == self.seekGeneration, self.isLooping else { return }
+                self.isLoopSeeking = false
+                self.player.playImmediately(atRate: self.rate)
             }
         }
     }
@@ -1196,6 +1266,7 @@ private final class RecordTutorialPlayer {
 
     /// Pauses and keeps it paused (even if a scheduled start was pending).
     func hold() {
+        isLooping = false
         isHeld = true
         watchingEnd = false
         player.pause()
@@ -1207,6 +1278,7 @@ private final class RecordTutorialPlayer {
     }
 
     func tearDown() {
+        isLooping = false
         isHeld = true
         watchingEnd = false
         player.pause()
@@ -1282,6 +1354,12 @@ private final class RecordTutorialPlayer {
     }
 
     private func tick(_ seconds: Double) {
+        if isLooping {
+            if !isLoopSeeking, let end = endSeconds, seconds.isFinite, seconds >= end {
+                restartLoop()
+            }
+            return
+        }
         if isHeld {
             if player.rate != 0 { player.pause() }
             return
@@ -1292,6 +1370,10 @@ private final class RecordTutorialPlayer {
     }
 
     private func reachedItemEnd() {
+        if isLooping {
+            if !isLoopSeeking { restartLoop() }
+            return
+        }
         guard watchingEnd else { return }
         watchingEnd = false
         onReachedEnd?()
