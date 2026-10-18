@@ -48,6 +48,8 @@ tutorial and dance-practice videos:
 - **AirPlay to a TV**: the video plays on the TV, the phone (and watch) are
   the remote. **Landscape** practice screen. **Open project files** straight
   from AirDrop, Messages or Files.
+- **Runs on** every iPhone with iOS 17+ (including the foldable iPhone Duo),
+  every iPad with iPadOS 17+, and Apple-silicon Macs (as an iPad app).
 - **Apple Watch remote** (watchOS 10+): play/pause, back/next 8-count,
   speed (also with the Digital Crown) and loop from your wrist, plus which
   8-count is playing. See 1.8.

@@ -16,9 +16,13 @@ Apple's websites. Everything else is already done in this repository.
 - Camera / Photos permission texts.
 - Built with Xcode 26/27 (Apple requires the iOS 26 SDK or newer for uploads
   since 28 April 2026).
-- App Store screenshots: every CI run takes them on a 6.9-inch iPhone
-  simulator → GitHub → Actions → newest "EightCount iOS build" → artifact
-  **ui-test-screenshots**.
+- Devices: every iPhone that runs iOS 17 or newer (incl. the foldable
+  **iPhone Duo**: layouts follow the available space, as Apple asks), **all
+  iPads** with iPadOS 17+ (any orientation, Split View / Stage Manager), and
+  **Macs with Apple silicon** (as "Designed for iPad").
+- App Store screenshots: every CI run takes them on a 6.9-inch iPhone and a
+  13-inch iPad simulator → GitHub → Actions → newest "EightCount iOS build" →
+  artifacts **ui-screenshots-iPhone** / **ui-screenshots-iPad**.
 - TestFlight upload workflow (`.github/workflows/eightcount-testflight.yml`),
   waiting for 4 secrets (step 4).
 
@@ -118,8 +122,13 @@ result: 4+.
 
 **Price:** Free. All territories.
 
-**Screenshots:** from the CI artifact (6.9-inch). Upload 3–6, e.g. practice
+**Screenshots:** from the CI artifacts: iPhone 6.9-inch AND iPad 13-inch
+(needed because the app supports iPad). Upload 3–6 each, e.g. practice
 screen, Practice sheet, record (ghost), compare, analysis.
+
+**Mac:** Pricing and Availability → **iPhone and iPad Apps on Apple Silicon
+Macs** → leave "Make this app available" ticked. (Optional: "Apple Vision
+Pro" can stay off.)
 
 **App Review notes** (helps the reviewer):
 > No account needed. Import any dance video from Photos or Files (a sample

@@ -105,9 +105,20 @@ jobs:
   # generated test video (practice, loop, notes, takes, compare, analysis).
   # Screenshots: Actions run → Artifacts → ui-screenshots.
   uitest:
-    name: UI test in Simulator (Xcode 27)
+    name: UI test in Simulator (Xcode 27, ${{ matrix.device }})
     runs-on: xcode-27
     timeout-minutes: 50
+    # The iPhone run must pass. The iPad run is new: it reports problems and
+    # makes the iPad App Store screenshots, but doesn't block yet.
+    continue-on-error: ${{ matrix.device == 'iPad' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        device: [iPhone, iPad]
+    env:
+      # Which simulator: a 6.9-inch iPhone / 13-inch iPad = App Store screenshot sizes.
+      SIM_FAMILY: ${{ matrix.device }}
+      SIM_PREFER: ${{ matrix.device == 'iPad' && 'iPad Pro 13' || 'Pro Max' }}
     defaults:
       run:
         working-directory: eightcount
@@ -137,12 +148,13 @@ jobs:
           import json, sys
           d = json.load(sys.stdin)["devices"]
           runtimes = sorted((r for r in d if "iOS" in r), reverse=True)
-          # Prefer a 6.9-inch "Pro Max": its screenshots are the size the
-          # App Store asks for, so every run also makes store screenshots.
-          for want in ("Pro Max", ""):
+          # Prefer the App Store screenshot size (SIM_PREFER), else any of the family.
+          import os
+          family, prefer = os.environ["SIM_FAMILY"], os.environ["SIM_PREFER"]
+          for want in (prefer, ""):
               for r in runtimes:
                   for dev in d[r]:
-                      if dev["name"].startswith("iPhone") and want in dev["name"]:
+                      if dev["name"].startswith(family) and want in dev["name"]:
                           print(dev["udid"]); sys.exit(0)
           sys.exit(1)')
           echo "UDID=$UDID" >> "$GITHUB_ENV"
@@ -215,7 +227,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ui-screenshots
+          name: ui-screenshots-${{ matrix.device }}
           path: |
             eightcount/shots
             eightcount/ui-*.xcresult

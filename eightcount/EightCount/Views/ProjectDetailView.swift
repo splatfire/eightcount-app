@@ -7,6 +7,8 @@ import SwiftData
 struct ProjectDetailView: View {
     @Bindable var project: Project
     @Environment(\.modelContext) private var modelContext
+    /// Regular on iPad and on the iPhone Duo's inner screen.
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var controller = PlayerController()
 
@@ -217,8 +219,13 @@ struct ProjectDetailView: View {
 
     private var practiceView: some View {
         GeometryReader { geo in
-            if geo.size.width > geo.size.height {
-                // Sideways: video and controls on the left, the 8-counts on the right.
+            // Laid out by the space we get (not by how the device is held):
+            // sideways, or a wide screen (iPad, Mac window), puts the
+            // 8-counts next to the video. Narrower screens (iPhone, the
+            // iPhone Duo's inner screen) stack them.
+            if geo.size.width > geo.size.height
+                || (horizontalSizeClass == .regular && geo.size.width >= 700) {
+                // Video and controls on the left, the 8-counts on the right.
                 let leftWidth = (geo.size.width * 0.6).rounded()
                 HStack(spacing: 0) {
                     VStack(spacing: 0) {

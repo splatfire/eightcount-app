@@ -18,6 +18,8 @@ enum OrientationLock {
 
     private static func set(_ newMask: UIInterfaceOrientationMask) {
         mask = newMask
+        // Only iPhones lock; on iPad / Mac every screen turns freely.
+        guard UIDevice.current.userInterfaceIdiom == .phone else { return }
         guard let scene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
             .first else { return }
@@ -37,6 +39,8 @@ enum OrientationLock {
 final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
-        OrientationLock.mask
+        // iPad (and Mac): every screen works in any shape, so never lock.
+        // (The iPhone Duo's big inner screen ignores locks anyway.)
+        UIDevice.current.userInterfaceIdiom == .phone ? OrientationLock.mask : .all
     }
 }

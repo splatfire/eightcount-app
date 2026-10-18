@@ -268,6 +268,11 @@ final class CameraRecorder {
         // We never record sound, so the capture session must not touch the
         // app's audio setup (the tutorial's music plays through it).
         session.automaticallyConfiguresApplicationAudioSession = false
+        // iPad: keep the camera running when the app shares the screen with
+        // another app (Split View / Stage Manager).
+        if session.isMultitaskingCameraAccessSupported {
+            session.isMultitaskingCameraAccessEnabled = true
+        }
 
         guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) else {
             return ConfigurationResult(device: nil, errorMessage: "No front camera was found on this device.")
