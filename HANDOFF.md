@@ -2,6 +2,12 @@
 
 _Last updated: 18 October 2026 · by Cursor (cloud session)_
 
+**Newest:** front/back camera switch on the record screen – PR #3
+(https://github.com/splatfire/eightcount-app/pull/3, branch
+`cursor/camera-flip-c99b`). Owner merges it when CI is green, then tests on
+the iPhone: flip button, record with the back camera, compare screen starts
+unmirrored for back-camera takes.
+
 ## State right now
 
 - **Moved to its own repo:** github.com/splatfire/eightcount-app (branch
