@@ -237,7 +237,7 @@ struct ProjectDetailView: View {
                     }
                     .frame(width: leftWidth)
                     Divider().overlay(Theme.hairline)
-                    countList
+                    countList(shrinksVideo: false)
                 }
                 .animation(.snappy, value: coach.isActive)
             } else {
@@ -251,7 +251,7 @@ struct ProjectDetailView: View {
                     coachBarIfNeeded
                     playbackControls
                     Divider().overlay(Theme.hairline)
-                    countList
+                    countList(shrinksVideo: true)
                 }
                 .animation(.snappy, value: coach.isActive)
             }
@@ -295,6 +295,16 @@ struct ProjectDetailView: View {
                     .onChanged { zoom.drag($0.translation, in: videoSize) }
                     .onEnded { _ in zoom.settle(in: videoSize) },
                 including: zoom.isZoomed ? .all : .subviews
+            )
+            // Swipe up = smaller video, swipe down = bigger (stacked layout, not zoomed).
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 24)
+                    .onEnded { value in
+                        let dy = value.translation.height
+                        guard abs(dy) > 50, abs(dy) > abs(value.translation.width) * 1.5 else { return }
+                        setBigVideo(dy > 0)
+                    },
+                including: (fitWidth || zoom.isZoomed) ? .subviews : .all
             )
             .overlay(alignment: .bottomTrailing) {
                 Button { toggleBigVideo() } label: {
@@ -404,7 +414,8 @@ struct ProjectDetailView: View {
         .padding(.vertical, Theme.spacingM)
     }
 
-    private var countList: some View {
+    /// `shrinksVideo`: pushing the list up makes a big video small (stacked layout).
+    private func countList(shrinksVideo: Bool) -> some View {
         CountListView(
             project: project,
             grid: grid,
@@ -425,7 +436,8 @@ struct ProjectDetailView: View {
             onSetMastery: { index, mastery in
                 NoteStore.setMastery(mastery, for: index, in: project, context: modelContext)
             },
-            onFormation: { formationTarget = EditTarget(id: $0) }
+            onFormation: { formationTarget = EditTarget(id: $0) },
+            onScrolledUp: shrinksVideo ? { setBigVideo(false) } : nil
         )
     }
 
@@ -704,6 +716,11 @@ struct ProjectDetailView: View {
 
     private func toggleBigVideo() {
         withAnimation(.snappy) { bigVideo.toggle() }
+    }
+
+    private func setBigVideo(_ big: Bool) {
+        guard bigVideo != big else { return }
+        withAnimation(.snappy) { bigVideo = big }
     }
 
     /// Tap on an 8-count: jump to its first beat.
