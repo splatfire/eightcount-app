@@ -257,6 +257,9 @@ app** (same update command as above). Then:
 With a free Apple ID the watch app also stops opening after 7 days, the
 same as the iPhone app.
 
+> **Publishing on the App Store:** see [APPSTORE.md](APPSTORE.md) (step by step,
+> plus ready-to-paste store texts).
+
 ## 2. Free Apple ID vs. paid Apple Developer Program
 
 | | Free Apple ID (Personal Team) | Paid Developer Program (99 USD/year) |

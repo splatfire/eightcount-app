@@ -136,10 +136,14 @@ jobs:
           UDID=$(xcrun simctl list devices available -j | python3 -c '
           import json, sys
           d = json.load(sys.stdin)["devices"]
-          for r in sorted((r for r in d if "iOS" in r), reverse=True):
-              for dev in d[r]:
-                  if dev["name"].startswith("iPhone"):
-                      print(dev["udid"]); sys.exit(0)
+          runtimes = sorted((r for r in d if "iOS" in r), reverse=True)
+          # Prefer a 6.9-inch "Pro Max": its screenshots are the size the
+          # App Store asks for, so every run also makes store screenshots.
+          for want in ("Pro Max", ""):
+              for r in runtimes:
+                  for dev in d[r]:
+                      if dev["name"].startswith("iPhone") and want in dev["name"]:
+                          print(dev["udid"]); sys.exit(0)
           sys.exit(1)')
           echo "UDID=$UDID" >> "$GITHUB_ENV"
           xcrun simctl list devices | grep "$UDID"
@@ -148,6 +152,9 @@ jobs:
         run: |
           xcrun simctl boot "$UDID" || true
           xcrun simctl bootstatus "$UDID" -b
+          # Clean status bar for App Store screenshots (9:41, full battery).
+          xcrun simctl status_bar "$UDID" override --time "9:41" --batteryState charged \
+            --batteryLevel 100 --cellularBars 4 --wifiBars 3 || true
           sleep 20
 
       - name: Build for testing
@@ -158,6 +165,10 @@ jobs:
             -destination "id=$UDID" -derivedDataPath build/test \
             2>&1 | tee build-test.log | grep -E "error:|TEST BUILD (SUCCEEDED|FAILED)" || true
           grep -q "TEST BUILD SUCCEEDED" build-test.log
+          # Apple rejects uploads without the privacy manifest in the app.
+          APP=$(find build/test -path "*Debug-iphonesimulator/EightCount.app" -maxdepth 6 -type d | head -1)
+          test -f "$APP/PrivacyInfo.xcprivacy" || { echo "PrivacyInfo.xcprivacy is missing from $APP"; exit 1; }
+          echo "Privacy manifest is in the app."
 
       - name: Allow saving to Photos in the simulator (for the export test)
         run: xcrun simctl privacy "$UDID" grant photos-add io.github.splatfire.eightcount || true

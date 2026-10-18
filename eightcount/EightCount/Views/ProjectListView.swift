@@ -17,6 +17,7 @@ struct ProjectListView: View {
     @State private var renameSection = ""
     @State private var errorMessage: String?
     @AppStorage(PracticeLog.remindersKey) private var reviewReminders = false
+    @State private var showAbout = false
     private var log: PracticeLog { PracticeLog.shared }
 
     var body: some View {
@@ -49,6 +50,11 @@ struct ProjectListView: View {
                         Toggle(isOn: reminderBinding) {
                             Label("Review reminders", systemImage: "bell")
                         }
+                        Button {
+                            showAbout = true
+                        } label: {
+                            Label("About & Privacy", systemImage: "info.circle")
+                        }
                     } label: {
                         Label("Settings", systemImage: "gearshape")
                     }
@@ -62,6 +68,7 @@ struct ProjectListView: View {
                 }
             }
         }
+        .sheet(isPresented: $showAbout) { AboutView() }
         .sheet(isPresented: $showNewProject) {
             NewProjectSheet { project in
                 path.append(project)   // open the new project right away
