@@ -2,6 +2,18 @@
 
 _Last updated: 18 October 2026 · by Cursor (cloud session)_
 
+**Newest (waiting for the owner to merge):**
+- PR #3 (https://github.com/splatfire/eightcount-app/pull/3, branch
+  `cursor/camera-flip-c99b`): record screen gets a front/back camera switch,
+  a "From the beginning" chip (start the take at 0:00 / back to your spot)
+  and a "Play loop" chip (tutorial section on repeat to warm up; pressing
+  record stops it and jumps back to the start before the countdown ends).
+- PR #4 (https://github.com/splatfire/eightcount-app/pull/4, branch
+  `cursor/streak-reminder-c99b`): daily streak reminder with a time picker
+  on the home screen (7 local notifications, rebuilt when the app opens).
+- None of these can be tested in the CI simulator (no camera, no
+  notifications): test on the iPhone after merging.
+
 ## State right now
 
 - **Moved to its own repo:** github.com/splatfire/eightcount-app (branch

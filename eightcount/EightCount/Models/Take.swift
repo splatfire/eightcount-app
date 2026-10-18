@@ -28,6 +28,8 @@ final class Take {
     var analysisData: Data?
     /// Recorded with the tutorial hidden (memory test).
     var memoryTest: Bool = false
+    /// Recorded with the back camera (shown unmirrored by default).
+    var backCamera: Bool = false
 
     var project: Project?
 

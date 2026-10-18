@@ -2,7 +2,8 @@ import SwiftUI
 import AVFoundation
 import UIKit
 
-/// Shows the live front-camera picture (like a mirror: left is left).
+/// Shows the live camera picture. The front camera looks like a mirror
+/// (left is left); the back camera is not mirrored.
 ///
 /// The picture fills the whole area (cropping the edges if needed).
 @MainActor
@@ -13,8 +14,8 @@ struct CameraPreviewView: UIViewRepresentable {
         let view = CameraPreviewUIView()
         view.previewLayer.session = recorder.session
         view.previewLayer.videoGravity = .resizeAspectFill
-        // The front camera preview is mirrored automatically
-        // (`automaticallyAdjustsVideoMirroring` stays on), like a mirror.
+        // The preview layer mirrors the front camera and does not mirror the
+        // back camera (`automaticallyAdjustsVideoMirroring` stays on).
         // The recorder keeps the preview upright when the phone is turned.
         recorder.attach(previewLayer: view.previewLayer)
         return view

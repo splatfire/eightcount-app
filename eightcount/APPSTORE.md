@@ -97,7 +97,7 @@ EightCount turns any dance tutorial or practice video into 8-counts you can lear
 • Practice coach: build it up 8-count by 8-count, or run a speed ladder from ½× to full speed
 • Spoken count-in "5, 6, 7, 8", beat click, your own move names
 • Memory test: hide the tutorial and dance from memory, then mark what you forgot
-• Record yourself with the front camera and compare side by side or as a see-through ghost
+• Record yourself with the front or back camera and compare side by side or as a see-through ghost
 • On-device AI analysis: arms, legs, posture and timing, with tips
 • Formations, progress per 8-count, practice streaks
 • Apple Watch remote and AirPlay to your TV

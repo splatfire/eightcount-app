@@ -3,9 +3,9 @@ import CoreMedia
 import Observation
 import UIKit
 
-/// Controls the FRONT camera: shows a live preview and records video-only
-/// movie files (no microphone at all, so no microphone permission needed;
-/// the music comes from the tutorial video).
+/// Controls the front or back camera: shows a live preview and records
+/// video-only movie files (no microphone at all, so no microphone permission
+/// needed; the music comes from the tutorial video).
 ///
 /// How AVFoundation camera recording works, in short:
 ///  - `AVCaptureSession` is the "pipeline". Inputs (the camera) go in,
@@ -27,6 +27,11 @@ final class CameraRecorder {
     private(set) var isRunning = false
     /// True from the moment recording is requested until the file is finished.
     private(set) var isRecording = false
+    /// Front or back. Remembered for the next recording (`cameraPosition` in
+    /// UserDefaults). Anything other than the back camera counts as front.
+    private(set) var position: AVCaptureDevice.Position = .front
+    /// True after setup when this device has both a front and a back camera.
+    private(set) var canSwitchCamera = false
     /// A readable problem, if the camera could not be set up.
     private(set) var errorMessage: String? = nil
 
@@ -50,8 +55,17 @@ final class CameraRecorder {
     /// The recording delegate must be kept alive until the file is finished.
     @ObservationIgnored private var recordingDelegate: MovieRecordingDelegate? = nil
     @ObservationIgnored private var stopRequested = false
+    /// A second tap must wait until the swap on `sessionQueue` has finished.
+    /// A recording must not start during that wait either: the file would use
+    /// the new camera while the take still remembered the old one.
+    private(set) var isSwitching = false
 
-    init() {}
+    init() {
+        let raw = UserDefaults.standard.integer(forKey: "cameraPosition")
+        if AVCaptureDevice.Position(rawValue: raw) == .back {
+            position = .back
+        }
+    }
 
     // MARK: - Camera on / off
 
@@ -72,9 +86,11 @@ final class CameraRecorder {
         if !isConfigured {
             let session = self.session
             let output = self.movieOutput
+            let preferredPosition = position
             let result: ConfigurationResult = await withCheckedContinuation { continuation in
                 sessionQueue.async {
-                    continuation.resume(returning: CameraRecorder.configure(session: session, output: output))
+                    continuation.resume(returning: CameraRecorder.configure(
+                        session: session, output: output, position: preferredPosition))
                 }
             }
             if let message = result.errorMessage {
@@ -82,6 +98,9 @@ final class CameraRecorder {
                 return
             }
             device = result.device
+            position = result.device?.position == .back ? .back : .front
+            canSwitchCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) != nil
+                && AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) != nil
             isConfigured = true
             rebuildRotationCoordinator()
         }
@@ -124,6 +143,35 @@ final class CameraRecorder {
             if session.isRunning { session.stopRunning() }
         }
         isRunning = false
+    }
+
+    /// Swaps between the front and the back camera. Does nothing while a
+    /// recording is running, or when the device has only one camera.
+    func switchCamera() async {
+        guard isConfigured, !isRecording, canSwitchCamera, !isSwitching else { return }
+        isSwitching = true
+        defer { isSwitching = false }
+
+        let target: AVCaptureDevice.Position = position == .back ? .front : .back
+        let session = self.session
+        let output = self.movieOutput
+        let result: ConfigurationResult = await withCheckedContinuation { continuation in
+            sessionQueue.async {
+                continuation.resume(returning: CameraRecorder.replaceCamera(
+                    session: session, output: output, with: target))
+            }
+        }
+
+        if let newDevice = result.device {
+            device = newDevice
+            position = newDevice.position == .back ? .back : .front
+            UserDefaults.standard.set(position.rawValue, forKey: "cameraPosition")
+            errorMessage = nil
+            rebuildRotationCoordinator()
+            applyPreviewRotation()
+        } else {
+            errorMessage = "The camera could not be switched."
+        }
     }
 
     // MARK: - Recording
@@ -252,9 +300,12 @@ final class CameraRecorder {
 
     // MARK: - One-time setup (runs on the session queue)
 
-    /// Builds the pipeline: front camera in, movie file out. No audio input.
+    /// Builds the pipeline: the chosen camera in, movie file out. No audio input.
+    /// If that camera is missing, the other one is used (an iPad or a Mac
+    /// may have only one).
     nonisolated private static func configure(session: AVCaptureSession,
-                                              output: AVCaptureMovieFileOutput) -> ConfigurationResult {
+                                              output: AVCaptureMovieFileOutput,
+                                              position: AVCaptureDevice.Position) -> ConfigurationResult {
         session.beginConfiguration()
         defer { session.commitConfiguration() }
 
@@ -274,8 +325,10 @@ final class CameraRecorder {
             session.isMultitaskingCameraAccessEnabled = true
         }
 
-        guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) else {
-            return ConfigurationResult(device: nil, errorMessage: "No front camera was found on this device.")
+        let other: AVCaptureDevice.Position = position == .back ? .front : .back
+        guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position)
+                ?? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: other) else {
+            return ConfigurationResult(device: nil, errorMessage: "No camera was found on this device.")
         }
 
         do {
@@ -292,14 +345,52 @@ final class CameraRecorder {
             return ConfigurationResult(device: nil, errorMessage: "The video file output could not be added.")
         }
         session.addOutput(output)
+        setUpFileConnection(output)
 
-        // The FILE is not mirrored (the compare screen mirrors on display).
+        return ConfigurationResult(device: camera, errorMessage: nil)
+    }
+
+    /// The saved file is never mirrored (the compare screen flips it on
+    /// screen). Changing the camera input builds a new connection, so this
+    /// has to run again after a switch.
+    nonisolated private static func setUpFileConnection(_ output: AVCaptureMovieFileOutput) {
         if let connection = output.connection(with: .video), connection.isVideoMirroringSupported {
             connection.automaticallyAdjustsVideoMirroring = false
             connection.isVideoMirrored = false
         }
+    }
 
-        return ConfigurationResult(device: camera, errorMessage: nil)
+    /// Replaces the session's camera input. Runs on the session queue.
+    /// If the new camera cannot be added, the previous one is put back and
+    /// the result's device is nil.
+    nonisolated private static func replaceCamera(session: AVCaptureSession,
+                                                  output: AVCaptureMovieFileOutput,
+                                                  with position: AVCaptureDevice.Position) -> ConfigurationResult {
+        guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position) else {
+            return ConfigurationResult(device: nil, errorMessage: nil)
+        }
+
+        session.beginConfiguration()
+        defer {
+            setUpFileConnection(output)
+            session.commitConfiguration()
+        }
+
+        let oldInputs = session.inputs.compactMap { $0 as? AVCaptureDeviceInput }
+        for input in oldInputs {
+            session.removeInput(input)
+        }
+
+        let newInput = try? AVCaptureDeviceInput(device: camera)
+        if let newInput, session.canAddInput(newInput) {
+            session.addInput(newInput)
+            return ConfigurationResult(device: camera, errorMessage: nil)
+        }
+
+        for input in oldInputs where session.canAddInput(input) {
+            session.addInput(input)
+        }
+        return ConfigurationResult(device: nil, errorMessage: nil)
     }
 }
 

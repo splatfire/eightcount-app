@@ -62,7 +62,7 @@ struct TakesListView: View {
             }
             .sheet(item: $takeToExport) { target in
                 ExportTakeSheet(take: target.take, project: project,
-                                mirrorMe: true, mirrorTutorial: tutorialMirrored)
+                                mirrorMe: !target.take.backCamera, mirrorTutorial: tutorialMirrored)
             }
             .confirmationDialog(
                 "Delete this recording?",

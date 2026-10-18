@@ -125,6 +125,11 @@ User asked for (subagents must use model "sonnet" to save tokens):
   (branch cursor/code-review-fixes-c99b): crash guards for imported/huge numbers, files deleted only
   after the database save, count-in/export/REC-timer races, small logic fixes; CI now also runs on PRs.
 
+- Front/back camera switch on the record screen (CameraRecorder.switchCamera, remembered choice,
+  Take.backCamera → compare/export start unmirrored for back-camera takes). PR #3. Needs an iPhone test.
+- Record screen: "From the beginning" chip and "Play loop" warm-up loop (RecordTutorialPlayer.startLoop). PR #3.
+- Daily streak reminder (PracticeLog.scheduleStreakReminders, time picker on the home screen). PR #4.
+
 ## Next step
 - User tests on device: camera recording, real analysis, Apple Intelligence tips; report any issues.
 - Free Apple ID: re-run `./setup-mac.sh --install --no-open` every 7 days.
