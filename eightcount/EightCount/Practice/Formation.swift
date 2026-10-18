@@ -25,6 +25,12 @@ struct Formation: Codable, Equatable {
         Color(red: 0.55, green: 0.90, blue: 0.85), Color(white: 0.85)
     ]
 
+    /// `%` alone crashes on a negative index (possible in an imported file).
+    static func color(at index: Int) -> Color {
+        let n = colors.count
+        return colors[((index % n) + n) % n]
+    }
+
     static func decode(_ data: Data?) -> Formation? {
         guard let data else { return nil }
         return try? JSONDecoder().decode(Formation.self, from: data)
@@ -68,7 +74,7 @@ struct FormationMiniMap: View {
                     let dot: CGFloat = dancer.isMe ? 9 : 6
                     let point = Self.point(dancer, in: size, inset: 5)
                     Circle()
-                        .fill(Formation.colors[dancer.colorIndex % Formation.colors.count])
+                        .fill(Formation.color(at: dancer.colorIndex))
                         .overlay(Circle().strokeBorder(Color.white, lineWidth: dancer.isMe ? 1.5 : 0))
                         .frame(width: dot, height: dot)
                         .position(point)
@@ -220,7 +226,7 @@ struct FormationEditorSheet: View {
     }
 
     private func dancerDot(_ dancer: Formation.Dancer) -> some View {
-        let color = Formation.colors[dancer.colorIndex % Formation.colors.count]
+        let color = Formation.color(at: dancer.colorIndex)
         let selected = selectedID == dancer.id
         return VStack(spacing: 2) {
             Text(initials(dancer.name))
