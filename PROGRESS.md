@@ -129,6 +129,8 @@ User asked for (subagents must use model "sonnet" to save tokens):
   Take.backCamera → compare/export start unmirrored for back-camera takes). PR #3. Needs an iPhone test.
 - Record screen: "From the beginning" chip and "Play loop" warm-up loop (RecordTutorialPlayer.startLoop). PR #3.
 - Daily streak reminder (PracticeLog.scheduleStreakReminders, time picker on the home screen). PR #4.
+- Practice screen: swipe up on the video or push the 8-count list up → big video gets small (PR #5,
+  CountListView.onScrolledUp; UI test step 7b).
 
 ## Next step
 - User tests on device: camera recording, real analysis, Apple Intelligence tips; report any issues.

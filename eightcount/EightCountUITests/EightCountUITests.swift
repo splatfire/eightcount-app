@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 
 /// Clicks through the main features on a simulator, taking screenshots.
 /// Runs on GitHub's Macs (see .github/workflows/eightcount-ios-build.yml),
@@ -329,6 +330,19 @@ final class EightCountUITests: XCTestCase {
         shot("29-zoomed")
         unzoom.tap()
         XCTAssertTrue(unzoom.waitForNonExistence(timeout: 5), "Zoom didn't reset")
+
+        // 7b. Swipe up on a big video makes it small again (stacked iPhone layout only).
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            let bigger = app.buttons["Bigger video"].firstMatch
+            waitFor(bigger, 5)
+            bigger.tap()
+            waitFor(app.buttons["Smaller video"].firstMatch, 5)
+            shot("29b-big-video")
+            videoView.swipeUp(velocity: .slow)
+            XCTAssertTrue(app.buttons["Bigger video"].firstMatch.waitForExistence(timeout: 5),
+                          "Swiping up on the video didn't make it smaller")
+            shot("29c-swiped-smaller")
+        }
 
         // 8. Progress: long-press 8-count 1 (on screen under the controls) → "Got it".
         // Buttons only: searching every element is slow and can time out in the Simulator.

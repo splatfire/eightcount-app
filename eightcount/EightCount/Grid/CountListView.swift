@@ -28,6 +28,11 @@ struct CountListView: View {
     let onSetMastery: (Int, Mastery) -> Void
     /// Long-press menu: "Formation…".
     let onFormation: (Int) -> Void
+    /// You pushed the list up with your finger (not the auto-follow while playing).
+    let onScrolledUp: (() -> Void)?
+
+    /// Top of the list content, to tell which way your finger scrolls it.
+    @State private var lastContentTop: CGFloat = 0
 
     init(project: Project, grid: CountGrid, currentIndex: Int?, loopedRange: ClosedRange<Int>?,
          sections: [PracticeSection], loopedSectionID: UUID?, followPlayback: Bool,
@@ -38,7 +43,8 @@ struct CountListView: View {
          onLoopSection: @escaping (PracticeSection) -> Void,
          onNewSection: @escaping (Int) -> Void,
          onSetMastery: @escaping (Int, Mastery) -> Void,
-         onFormation: @escaping (Int) -> Void) {
+         onFormation: @escaping (Int) -> Void,
+         onScrolledUp: (() -> Void)? = nil) {
         self.project = project
         self.grid = grid
         self.currentIndex = currentIndex
@@ -54,6 +60,7 @@ struct CountListView: View {
         self.onNewSection = onNewSection
         self.onSetMastery = onSetMastery
         self.onFormation = onFormation
+        self.onScrolledUp = onScrolledUp
     }
 
     var body: some View {
@@ -74,6 +81,16 @@ struct CountListView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
                 .padding(.bottom, 28)
+                .background(alignment: .top) {
+                    GeometryReader { geo in
+                        Color.clear.preference(key: ContentTopKey.self,
+                                               value: geo.frame(in: .named("countList")).minY)
+                    }
+                }
+            }
+            .coordinateSpace(name: "countList")
+            .onPreferenceChange(ContentTopKey.self) { top in
+                contentTopChanged(top)
             }
             .onChange(of: currentIndex) { _, newIndex in
                 guard followPlayback, let newIndex else { return }
@@ -88,6 +105,15 @@ struct CountListView: View {
             .mask { topFade }
             .background(Theme.background)
         }
+    }
+
+    /// Only once the list really moved up (past the first rows), and never
+    /// while it scrolls by itself to follow the video.
+    private func contentTopChanged(_ top: CGFloat) {
+        let movedUp = top < lastContentTop - 0.5
+        lastContentTop = top
+        guard movedUp, top < -24, !followPlayback else { return }
+        onScrolledUp?()
     }
 
     private var topFade: some View {
@@ -313,5 +339,12 @@ struct CountListView: View {
             lookup[note.countIndex] = note
         }
         return lookup
+    }
+}
+
+private struct ContentTopKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
