@@ -262,6 +262,22 @@ same as the iPhone app.
 > **Publishing on the App Store:** see [APPSTORE.md](APPSTORE.md) (step by step,
 > plus ready-to-paste store texts).
 
+### 1.9 Working on the app with Cursor and Claude
+
+You can continue in **Cursor** on your Mac or in the **Claude app** – they
+stay in sync through GitHub, and both read the same notes about where you
+left off (`HANDOFF.md`, rules in `AGENTS.md`).
+
+1. In Cursor: **File → Open Folder… → `splatfire`** (the whole folder, not
+   only `eightcount`). Sign in to GitHub in Cursor when it asks (needed to send
+   your work back).
+2. Start each session by telling the AI: **"start"** (it runs
+   `./handoff.sh start`: gets the newest work and reads `HANDOFF.md`).
+3. Before switching apps, tell it: **"save and hand off"** (it updates
+   `HANDOFF.md` and runs `./handoff.sh save "…"`).
+4. Use one app at a time. In Terminal you can do the same yourself:
+   `cd ~/splatfire && ./handoff.sh start` / `./handoff.sh save "what I did"`.
+
 ## 2. Free Apple ID vs. paid Apple Developer Program
 
 | | Free Apple ID (Personal Team) | Paid Developer Program (99 USD/year) |

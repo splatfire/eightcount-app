@@ -116,6 +116,9 @@ User asked for (subagents must use model "sonnet" to save tokens):
   PracticeLog (streak, review notifications), Formation (CountNote.formationData, editor, mini maps),
   AirPlay (AVRoutePickerView, isOnTV). UI test testPracticeTools covers most of it.
 
+- Cursor + Claude Code hand-off: AGENTS.md (shared rules), HANDOFF.md (where we left off),
+  CLAUDE.md (imports AGENTS.md), .cursor/rules/handoff.mdc (alwaysApply), handoff.sh start|save|status.
+
 ## Next step
 - User tests on device: camera recording, real analysis, Apple Intelligence tips; report any issues.
 - Free Apple ID: re-run `./setup-mac.sh --install --no-open` every 7 days.

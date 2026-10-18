@@ -1,5 +1,7 @@
 # EightCount — notes for Claude Code on the owner's Mac
 
+Shared rules + hand-off with Cursor: ../AGENTS.md and ../HANDOFF.md (read first, update last).
+
 Native iPhone app (SwiftUI, SwiftData, AVFoundation, Vision, FoundationModels), iOS 17+ target,
 built with Xcode 27. The owner is a beginner — explain in plain words, do the work yourself.
 
