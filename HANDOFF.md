@@ -1,30 +1,32 @@
 # Where we left off
 
-_Last updated: 18 October 2026 · by Claude Code (cloud session)_
+_Last updated: 18 October 2026 · by Cursor_
 
 ## State right now
 
-- **Moved to its own repo:** github.com/splatfire/eightcount-app (branch
-  `main`). On the Mac the new folder is `~/eightcount-app` (the old
-  `~/splatfire` is no longer used for the app).
-
-- EightCount builds and all CI checks are green (Xcode 27 + 26, UI tests on
-  iPhone 6.9" and iPad 13" simulators).
-- Recent work: App Store prep (privacy manifest, `eightcount/PRIVACY.md`,
-  in-app About & Privacy, `eightcount/APPSTORE.md` with store texts),
-  universal app (iPhone incl. iPhone Duo, iPad, Apple-silicon Mac),
-  fixes for the memory-test recording crash and the countdown beeps.
-- Plan: free app on the App Store first; one-time "Pro" unlock later.
+- **Repo:** github.com/splatfire/eightcount-app, branch `main`. On the Mac
+  the folder is `~/eightcount-app`.
+- EightCount builds and CI was green (Xcode 27 + 26, UI tests on iPhone
+  6.9" and iPad 13" simulators). The iPhone app still only builds on a Mac
+  with Xcode (`cd eightcount && ./setup-mac.sh`).
+- Cloud agents (Linux) now have Swift 6.4.1. A check of the plain math
+  passed: 120 BPM, count 1 at 0.5s, 20s video → 5 eight-counts; a 0.5×
+  take lines up; a watch speed message round-trips. This is not an iPhone
+  build.
+- Recent app work: App Store prep, universal app, memory-test crash and
+  countdown beep fixes. Plan: free app first, one-time Pro unlock later.
 
 ## Waiting on the owner
 
-1. Join the Apple Developer Program (99 USD/year), then follow
+1. Click **Save** on the Cloud Agent environment card so later agents
+   start with Swift already installed.
+2. Join the Apple Developer Program (99 USD/year), then follow
    `eightcount/APPSTORE.md` from step 2.
-2. Test on the iPhone after `./setup-mac.sh --update`:
+3. Test on the iPhone after `./setup-mac.sh --update`:
    - memory test while recording (eye button) – no crash any more?
    - countdown beeps on time with 3-2-1? If not: beep before/after the
      number, by how much, Bluetooth headphones yes/no?
-3. Older open questions: does the Apple Watch app install/work? After a 0.75×
+4. Older open questions: does the Apple Watch app install/work? After a 0.75×
    recording, is the 1× replay gap constant or growing?
 
 ## Next steps (for whichever app works next)
