@@ -118,6 +118,7 @@ final class PlayerController {
         loadGeneration += 1
         let generation = loadGeneration
 
+        cancelCountIn()
         player.pause()
         isReady = false
         loadError = nil
@@ -228,6 +229,7 @@ final class PlayerController {
 
     /// Plays after `wait` seconds (while the count-in sounds).
     private func waitThenPlay(_ wait: TimeInterval) {
+        countInTask?.cancel()
         isCountingIn = true
         countInTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(wait))

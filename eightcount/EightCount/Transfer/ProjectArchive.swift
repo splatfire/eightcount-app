@@ -256,8 +256,11 @@ enum ProjectArchive {
 
         // 4. Create the SwiftData objects. Insert each object into the
         //    context first, then connect it to its parent.
-        let project = Project(title: newTitle, section: section,
-                              bpm: max(0, file.bpm), offset: file.offset)
+        // Tempo outside the tapper's range (or not a real number) means "no tempo".
+        let bpm = file.bpm.isFinite && TempoTapper.validRange.contains(file.bpm) ? file.bpm : 0
+        // A video time, kept inside one day. Anything that isn't a real number becomes 0.
+        let offset = file.offset.isFinite ? min(max(file.offset, 0), 86_400.0) : 0
+        let project = Project(title: newTitle, section: section, bpm: bpm, offset: offset)
         project.originalVideoName = file.originalVideoName
         project.createdAt = .now
         project.updatedAt = .now   // newest, so it shows at the top of the list
@@ -281,7 +284,10 @@ enum ProjectArchive {
             note.project = project
 
             for exportSnap in exportNote.snapshots.sorted(by: { $0.time < $1.time }) {
-                guard !exportSnap.jpeg.isEmpty else { continue }   // skip empty pictures
+                // Skip empty pictures, and times that aren't a real second inside one day.
+                guard !exportSnap.jpeg.isEmpty,
+                      exportSnap.time.isFinite,
+                      (0.0...86_400.0).contains(exportSnap.time) else { continue }
                 let snap = PoseSnapshot(time: exportSnap.time, imageData: exportSnap.jpeg)
                 snap.createdAt = exportSnap.createdAt
                 context.insert(snap)

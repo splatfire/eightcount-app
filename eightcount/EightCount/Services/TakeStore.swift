@@ -34,7 +34,12 @@ enum TakeStore {
             project.takes.removeAll { $0.persistentModelID == id }
         }
         context.delete(take)
-        try? context.save()
+        do {
+            try context.save()
+        } catch {
+            context.rollback()
+            return
+        }
         VideoStorage.deleteVideo(named: fileName)
     }
 

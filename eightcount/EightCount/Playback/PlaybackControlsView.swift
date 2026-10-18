@@ -359,10 +359,15 @@ struct PlaybackControlsView: View {
 
     /// "0:12.3" (one decimal) for the compact loop bar.
     private func shortTime(_ seconds: Double) -> String {
-        guard seconds.isFinite else { return "--:--" }
-        let minutes = Int(seconds) / 60
-        let secs = seconds - Double(minutes * 60)
-        return String(format: "%d:%04.1f", minutes, secs)
+        // Past this, `Int` conversion traps and the clock is meaningless.
+        guard seconds.isFinite, abs(seconds) < 1e9 else { return "--:--" }
+        let sign = seconds < 0 ? "-" : ""
+        let total = abs(seconds)
+        // Round before splitting so the seconds field stays under 60.
+        let tenths = (total * 10).rounded()
+        let minutes = Int(tenths) / 600
+        let secs = (tenths - Double(minutes * 600)) / 10
+        return sign + String(format: "%d:%04.1f", minutes, secs)
     }
 }
 

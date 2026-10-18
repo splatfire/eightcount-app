@@ -819,6 +819,7 @@ private final class RecordSessionModel {
         discardOnFinish = false
         tutorialEndSeconds = startTime
         savedTake = nil
+        recordingStartSeconds = CMClockGetTime(CMClockGetHostTimeClock()).seconds
         phase = .starting
 
         recorder.startRecording(

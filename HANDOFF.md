@@ -1,6 +1,6 @@
 # Where we left off
 
-_Last updated: 18 October 2026 · by Claude Code (cloud session)_
+_Last updated: 18 October 2026 · by Cursor (cloud session)_
 
 ## State right now
 
@@ -8,9 +8,15 @@ _Last updated: 18 October 2026 · by Claude Code (cloud session)_
   `main`). On the Mac the new folder is `~/eightcount-app` (the old
   `~/splatfire` is no longer used for the app).
 
-- EightCount builds and all CI checks are green (Xcode 27 + 26, UI tests on
+- **New: code review fixes waiting in a pull request** –
+  https://github.com/splatfire/eightcount-app/pull/2 (branch
+  `cursor/code-review-fixes-c99b`, not merged into `main` yet). It has crash
+  guards for imported files, safer deletes, playback/export race fixes and
+  small logic fixes. CI now also runs on pull requests. Once CI is green and
+  the owner agrees, merge it on GitHub (the owner presses "Merge").
+- `main` builds and all CI checks are green (Xcode 27 + 26, UI tests on
   iPhone 6.9" and iPad 13" simulators).
-- Recent work: App Store prep (privacy manifest, `eightcount/PRIVACY.md`,
+- Earlier work: App Store prep (privacy manifest, `eightcount/PRIVACY.md`,
   in-app About & Privacy, `eightcount/APPSTORE.md` with store texts),
   universal app (iPhone incl. iPhone Duo, iPad, Apple-silicon Mac),
   fixes for the memory-test recording crash and the countdown beeps.
@@ -18,17 +24,28 @@ _Last updated: 18 October 2026 · by Claude Code (cloud session)_
 
 ## Waiting on the owner
 
-1. Join the Apple Developer Program (99 USD/year), then follow
+1. Look at PR #2 and merge it if CI is green (or ask the next session to).
+2. Join the Apple Developer Program (99 USD/year), then follow
    `eightcount/APPSTORE.md` from step 2.
-2. Test on the iPhone after `./setup-mac.sh --update`:
+3. Test on the iPhone after `./setup-mac.sh --update`:
    - memory test while recording (eye button) – no crash any more?
    - countdown beeps on time with 3-2-1? If not: beep before/after the
      number, by how much, Bluetooth headphones yes/no?
-3. Older open questions: does the Apple Watch app install/work? After a 0.75×
+   - phone call / Control Center during recording: does the camera come back?
+4. Older open questions: does the Apple Watch app install/work? After a 0.75×
    recording, is the 1× replay gap constant or growing?
 
 ## Next steps (for whichever app works next)
 
+- Review findings NOT fixed yet (need an iPhone to test, so left alone):
+  camera recovery after an interruption (`CameraRecorder` has no
+  interruption observer), background task so a take finishes saving when the
+  app is left mid-recording, closing the record screen while a take is
+  "finishing" discards it (`RecordView` `end()`), `SyncedPlayback` has no
+  `deinit` removing its time observer, `CountCues` voice-loading task not
+  cancelled on stop. Checked and rejected as not real: left/right coach
+  labels (Vision names joints by the dancer's own body), formation drag hit
+  area, play-after-seek at the end of the video.
 - When the owner has the paid team: help with `setup-mac.sh --install --team …`,
   App Store Connect, the 4 GitHub secrets for TestFlight.
 - If the bundle ID is "not available" on the paid team: pick a new one
@@ -39,5 +56,5 @@ _Last updated: 18 October 2026 · by Claude Code (cloud session)_
 
 ## Half-finished / caution
 
-- Nothing half-finished.
+- PR #2 is open (see above); `main` does not have those fixes yet.
 - Don't build App Store uploads with a beta Xcode.

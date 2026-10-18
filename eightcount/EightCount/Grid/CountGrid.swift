@@ -59,8 +59,10 @@ struct CountGrid: Equatable {
         let t = time + Self.boundaryTolerance
         // No 8-counts at all (e.g. count 1 is after the end of the video).
         guard isValid, count > 0, time.isFinite, t >= offset else { return nil }
-        let i = Int(floor((t - offset) / eightCountDuration))
-        return min(i, count - 1)
+        // `floor` is NaN or huge when the inputs are; `Int` would trap.
+        let raw = floor((t - offset) / eightCountDuration)
+        guard raw.isFinite else { return nil }
+        return min(raw >= Double(count) ? count - 1 : Int(raw), count - 1)
     }
 
     /// The count (1...8) within its 8-count at `time`, or nil before count 1.

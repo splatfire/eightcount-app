@@ -364,6 +364,7 @@ private final class ExportModel {
     private(set) var errorMessage: String?
 
     private var task: Task<Void, Never>?
+    private var runID: UUID?
 
     var isWorking: Bool { phase == .exporting || phase == .saving }
 
@@ -373,6 +374,8 @@ private final class ExportModel {
         progress = 0
         phase = kind.needsTutorial ? .exporting : .saving
 
+        let id = UUID()
+        runID = id
         task = Task { [weak self] in
             var exported: URL?
             do {
@@ -380,31 +383,43 @@ private final class ExportModel {
                 try await TakeExporter.requestPhotosAccess()
                 let url = try await TakeExporter.export(take: snapshot, kind: kind) { value in
                     Task { @MainActor [weak self] in
-                        guard let self, self.phase == .exporting else { return }
+                        guard let self, self.runID == id, self.phase == .exporting else { return }
                         self.progress = min(max(value, 0), 1)
                     }
                 }
                 exported = url
                 try Task.checkCancellation()
-                self?.phase = .saving
+                if let self, self.runID == id {
+                    self.phase = .saving
+                }
                 try await TakeExporter.saveToPhotos(url)   // also deletes the temp file
                 exported = nil
-                self?.phase = .saved
+                if let self, self.runID == id {
+                    self.phase = .saved
+                }
             } catch is CancellationError {
-                self?.phase = .idle
+                if let self, self.runID == id {
+                    self.phase = .idle
+                }
             } catch {
-                self?.errorMessage = error.localizedDescription
-                self?.phase = .idle
+                if let self, self.runID == id {
+                    self.errorMessage = error.localizedDescription
+                    self.phase = .idle
+                }
             }
             if let exported {
                 try? FileManager.default.removeItem(at: exported)
             }
-            self?.task = nil
+            if let self, self.runID == id {
+                self.task = nil
+            }
         }
     }
 
     func cancel() {
+        runID = nil
         task?.cancel()
+        task = nil
         if isWorking { phase = .idle }
     }
 }

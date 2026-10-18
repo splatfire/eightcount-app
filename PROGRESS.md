@@ -121,6 +121,10 @@ User asked for (subagents must use model "sonnet" to save tokens):
 
 - Moved EightCount to its own public repo splatfire/eightcount-app (branch main), full history kept.
 
+- Code review by 4 parallel Grok 4.7 (fast) agents, findings checked by hand, fixes in PR #2
+  (branch cursor/code-review-fixes-c99b): crash guards for imported/huge numbers, files deleted only
+  after the database save, count-in/export/REC-timer races, small logic fixes; CI now also runs on PRs.
+
 ## Next step
 - User tests on device: camera recording, real analysis, Apple Intelligence tips; report any issues.
 - Free Apple ID: re-run `./setup-mac.sh --install --no-open` every 7 days.

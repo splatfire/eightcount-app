@@ -52,10 +52,13 @@ extension ButtonStyle where Self == BigButtonStyle {
 
 /// Formats seconds as "1:05.32" (minutes:seconds.hundredths).
 func formatTime(_ seconds: Double) -> String {
-    guard seconds.isFinite else { return "--:--" }
+    // Past this, `Int` conversion traps and the clock is meaningless.
+    guard seconds.isFinite, abs(seconds) < 1e9 else { return "--:--" }
     let sign = seconds < 0 ? "-" : ""
     let total = abs(seconds)
-    let minutes = Int(total) / 60
-    let secs = total - Double(minutes * 60)
+    // Round before splitting so the seconds field stays under 60.
+    let hundredths = (total * 100).rounded()
+    let minutes = Int(hundredths) / 6000
+    let secs = (hundredths - Double(minutes * 6000)) / 100
     return sign + String(format: "%d:%05.2f", minutes, secs)
 }

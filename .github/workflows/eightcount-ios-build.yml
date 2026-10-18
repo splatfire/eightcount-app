@@ -10,6 +10,11 @@ on:
     paths:
       - "eightcount/**"
       - ".github/workflows/eightcount-ios-build.yml"
+  # Also check pull requests, so fixes are compiled and tested before they reach main.
+  pull_request:
+    paths:
+      - "eightcount/**"
+      - ".github/workflows/eightcount-ios-build.yml"
   workflow_dispatch:
 
 # A newer push cancels the build of an older one.
