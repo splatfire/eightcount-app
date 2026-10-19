@@ -132,6 +132,7 @@ User asked for (subagents must use model "sonnet" to save tokens):
 - Practice screen: swipe up on the video or push the 8-count list up → big video gets small (PR #5,
   CountListView.onScrolledUp; UI test step 7b).
 - Fix: swipe didn't work on the iPhone → swipe/flick anywhere on video + controls (PR #6).
+- UI test fix: scroll the list by dragging on the list, not mid-screen (that now resizes the video) (PR #7).
 
 ## Next step
 - User tests on device: camera recording, real analysis, Apple Intelligence tips; report any issues.
