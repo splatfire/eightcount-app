@@ -40,7 +40,13 @@ other agent. The owner switches between these apps; this file and
   (or `--install`). Logs: `eightcount/build.log`, `eightcount/device-build.log`.
 - CI (GitHub Actions, `.github/workflows/eightcount-ios-build.yml`): builds
   with Xcode 27 + 26 and runs the UI tests on an iPhone and an iPad simulator
-  on every push. Check it after pushing; a red CI must be fixed.
+  on every push and pull request. Check it after pushing; a red CI must be fixed.
+- **Pull requests: always merge them yourself** (owner's standing request,
+  19 Oct 2026). When the work on a branch is done and its CI is green, merge
+  it into `main` (fix conflicts in HANDOFF.md / PROGRESS.md by hand), push
+  `main`, and check that CI on `main` is green too. Don't wait for the owner.
+- Subagents: use cheaper models where they fit; Grok subagents always in
+  fast mode (owner's preference).
 - Swift 5 language mode. Liquid Glass code is guarded by `#if compiler(>=6.2)`
   + `#available(iOS 26.0, *)` (`eightcount/EightCount/Design/Glass.swift`).
 - Commit messages: plain English, what and why. No AI model names in commits
