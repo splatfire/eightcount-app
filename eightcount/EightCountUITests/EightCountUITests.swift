@@ -350,6 +350,7 @@ final class EightCountUITests: XCTestCase {
             app.buttons["Back one frame"].firstMatch.swipeUp(velocity: .fast)
             XCTAssertTrue(app.buttons["Bigger video"].firstMatch.waitForExistence(timeout: 5),
                           "Flicking up on the controls didn't make the video smaller")
+            sleep(1)   // let the resize animation finish before the list is used
             shot("29d-controls-swiped-smaller")
         }
 
@@ -415,8 +416,12 @@ final class EightCountUITests: XCTestCase {
     /// Scrolls the 8-count list until `element` is on screen.
     private func scrollList(to element: XCUIElement, in app: XCUIApplication) {
         for _ in 0..<3 where !(element.exists && element.isHittable) {
-            // Drag in the lower part of the screen (the list), not on the video.
-            app.swipeUp(velocity: .slow)
+            // Drag in the lower part of the screen (the list). The middle of the
+            // screen is the video/controls, where a swipe resizes the video.
+            let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.88))
+            let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.62))
+            from.press(forDuration: 0.05, thenDragTo: to)
+            sleep(1)
         }
         XCTAssertTrue(element.isHittable, "Can't scroll to \(element)")
     }
