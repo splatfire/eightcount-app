@@ -133,6 +133,7 @@ User asked for (subagents must use model "sonnet" to save tokens):
   CountListView.onScrolledUp; UI test step 7b).
 - Fix: swipe didn't work on the iPhone → swipe/flick anywhere on video + controls (PR #6).
 - UI test fix: scroll the list by dragging on the list, not mid-screen (that now resizes the video) (PR #7).
+- UI test fix: pause before "Bigger video" so it isn't a double-tap with the zoom reset (PR #8).
 
 ## Next step
 - User tests on device: camera recording, real analysis, Apple Intelligence tips; report any issues.
