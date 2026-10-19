@@ -333,10 +333,13 @@ final class EightCountUITests: XCTestCase {
 
         // 7b. Swipe up on a big video makes it small again (stacked iPhone layout only).
         if UIDevice.current.userInterfaceIdiom == .phone {
+            // Wait first: two quick taps on the video count as its double-tap
+            // (which resizes too) and would undo this tap.
+            sleep(1)
             let bigger = app.buttons["Bigger video"].firstMatch
             waitFor(bigger, 5)
             bigger.tap()
-            waitFor(app.buttons["Smaller video"].firstMatch, 5)
+            waitFor(app.buttons["Smaller video"].firstMatch, 8)
             shot("29b-big-video")
             videoView.swipeUp(velocity: .fast)
             XCTAssertTrue(app.buttons["Bigger video"].firstMatch.waitForExistence(timeout: 5),
