@@ -338,10 +338,19 @@ final class EightCountUITests: XCTestCase {
             bigger.tap()
             waitFor(app.buttons["Smaller video"].firstMatch, 5)
             shot("29b-big-video")
-            videoView.swipeUp(velocity: .slow)
+            videoView.swipeUp(velocity: .fast)
             XCTAssertTrue(app.buttons["Bigger video"].firstMatch.waitForExistence(timeout: 5),
-                          "Swiping up on the video didn't make it smaller")
+                          "Flicking up on the video didn't make it smaller")
             shot("29c-swiped-smaller")
+
+            // Swipe down on the video = big again, then flick up on the controls.
+            videoView.swipeDown(velocity: .fast)
+            XCTAssertTrue(app.buttons["Smaller video"].firstMatch.waitForExistence(timeout: 5),
+                          "Swiping down on the video didn't make it bigger")
+            app.buttons["Back one frame"].firstMatch.swipeUp(velocity: .fast)
+            XCTAssertTrue(app.buttons["Bigger video"].firstMatch.waitForExistence(timeout: 5),
+                          "Flicking up on the controls didn't make the video smaller")
+            shot("29d-controls-swiped-smaller")
         }
 
         // 8. Progress: long-press 8-count 1 (on screen under the controls) → "Got it".

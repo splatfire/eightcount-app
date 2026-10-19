@@ -90,8 +90,9 @@ struct CountListView: View {
             }
             .coordinateSpace(name: "countList")
             .onPreferenceChange(ContentTopKey.self) { top in
-                contentTopChanged(top)
+                if #unavailable(iOS 18.0) { contentTopChanged(top) }
             }
+            .modifier(ScrollTopReporter { contentTopChanged($0) })
             .onChange(of: currentIndex) { _, newIndex in
                 guard followPlayback, let newIndex else { return }
                 scroll(proxy, to: newIndex)
@@ -346,5 +347,23 @@ private struct ContentTopKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
+    }
+}
+
+/// iOS 18+: the scroll view reports its own offset, which is more reliable
+/// than reading a frame inside a lazy stack. Same sign as `ContentTopKey`.
+private struct ScrollTopReporter: ViewModifier {
+    let onChange: (CGFloat) -> Void
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.onScrollGeometryChange(for: CGFloat.self) { geometry in
+                -(geometry.contentOffset.y + geometry.contentInsets.top)
+            } action: { _, top in
+                onChange(top)
+            }
+        } else {
+            content
+        }
     }
 }

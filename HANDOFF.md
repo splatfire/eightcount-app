@@ -6,6 +6,9 @@ _Last updated: 18 October 2026 · by Cursor (cloud session)_
 camera switch, "From the beginning", "Play loop" warm-up; daily streak
 reminder with a time picker on the home screen; swipe up on the practice
 video (or push the 8-count list up) to make it small, swipe down for big.
+PR #6 (https://github.com/splatfire/eightcount-app/pull/6) fixes the swipe
+(owner: "swipe up doesn't work"): it now works anywhere on the video or
+controls and quick flicks count. Waiting for the owner to merge + retest.
 The owner should test the camera switch, the loop and the reminder on the
 iPhone (CI has no camera and can't test notifications).
 

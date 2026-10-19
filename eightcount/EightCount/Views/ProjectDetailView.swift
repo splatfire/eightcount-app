@@ -245,11 +245,17 @@ struct ProjectDetailView: View {
                     // Video: a rounded card with 16 pt side padding, never taller
                     // than ~1/3 of the screen (2/3 with "bigger video"), so the
                     // controls and the 8-count list still fit.
-                    videoCard(available: CGSize(width: max(geo.size.width - 32, 0),
-                                                height: geo.size.height * (bigVideo ? 0.62 : 0.34)),
-                              fitWidth: false)
-                    coachBarIfNeeded
-                    playbackControls
+                    // Swipe up anywhere on the video or the controls = smaller
+                    // video, swipe down = bigger (not while zoomed: that drag pans).
+                    VStack(spacing: 0) {
+                        videoCard(available: CGSize(width: max(geo.size.width - 32, 0),
+                                                    height: geo.size.height * (bigVideo ? 0.62 : 0.34)),
+                                  fitWidth: false)
+                        coachBarIfNeeded
+                        playbackControls
+                    }
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(resizeSwipe, including: zoom.isZoomed ? .subviews : .all)
                     Divider().overlay(Theme.hairline)
                     countList(shrinksVideo: true)
                 }
@@ -295,16 +301,6 @@ struct ProjectDetailView: View {
                     .onChanged { zoom.drag($0.translation, in: videoSize) }
                     .onEnded { _ in zoom.settle(in: videoSize) },
                 including: zoom.isZoomed ? .all : .subviews
-            )
-            // Swipe up = smaller video, swipe down = bigger (stacked layout, not zoomed).
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 24)
-                    .onEnded { value in
-                        let dy = value.translation.height
-                        guard abs(dy) > 50, abs(dy) > abs(value.translation.width) * 1.5 else { return }
-                        setBigVideo(dy > 0)
-                    },
-                including: (fitWidth || zoom.isZoomed) ? .subviews : .all
             )
             .overlay(alignment: .bottomTrailing) {
                 Button { toggleBigVideo() } label: {
@@ -716,6 +712,18 @@ struct ProjectDetailView: View {
 
     private func toggleBigVideo() {
         withAnimation(.snappy) { bigVideo.toggle() }
+    }
+
+    /// A quick flick counts too: iOS predicts where the finger was heading.
+    private var resizeSwipe: some Gesture {
+        DragGesture(minimumDistance: 16)
+            .onEnded { value in
+                let moved = value.translation
+                let flung = value.predictedEndTranslation.height
+                let dy = abs(flung) > abs(moved.height) ? flung : moved.height
+                guard abs(dy) > 40, abs(moved.height) > abs(moved.width) else { return }
+                setBigVideo(dy > 0)
+            }
     }
 
     private func setBigVideo(_ big: Bool) {
